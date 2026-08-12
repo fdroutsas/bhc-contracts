@@ -142,7 +142,10 @@ ordersCheckout:
       - $ref: '#/components-orderId'
     responses:
       '200':
-        description: Gateway checkout session.
+        description: >
+          Credit balance is consumed first (§7). If it fully covers the
+          proforma the order settles immediately (status=paid, no session);
+          otherwise a gateway session is returned for the remainder.
         content:
           application/json:
             schema:
@@ -151,8 +154,13 @@ ordersCheckout:
               properties:
                 data:
                   type: object
-                  required: [session_id, redirect_url, expires_at]
+                  required: [status, balance_applied]
                   properties:
+                    status:
+                      type: string
+                      enum: [session, paid]
+                    balance_applied:
+                      $ref: '../components/schemas.yaml#/Money'
                     session_id:
                       type: string
                     redirect_url:

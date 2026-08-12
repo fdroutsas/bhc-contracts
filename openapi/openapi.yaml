@@ -96,6 +96,8 @@ paths:
     $ref: './paths/admin.yaml#/totpConfirm'
   /admin/auth/totp/recovery-codes:
     $ref: './paths/admin.yaml#/totpRecoveryCodes'
+  /admin/accounts/{id}/credit:
+    $ref: './paths/admin.yaml#/accountsCredit'
   /admin/settings:
     $ref: './paths/admin.yaml#/settings'
   /admin/settings/{key}:

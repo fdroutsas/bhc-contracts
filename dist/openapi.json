@@ -1753,7 +1753,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Gateway checkout session.",
+            "description": "Credit balance is consumed first (§7). If it fully covers the proforma the order settles immediately (status=paid, no session); otherwise a gateway session is returned for the remainder.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -1765,11 +1765,20 @@
                     "data": {
                       "type": "object",
                       "required": [
-                        "session_id",
-                        "redirect_url",
-                        "expires_at"
+                        "status",
+                        "balance_applied"
                       ],
                       "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "session",
+                            "paid"
+                          ]
+                        },
+                        "balance_applied": {
+                          "$ref": "#/components/schemas/Money"
+                        },
                         "session_id": {
                           "type": "string"
                         },
@@ -2253,6 +2262,100 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/admin/accounts/{id}/credit": {
+      "post": {
+        "operationId": "admin.accounts.credit",
+        "tags": [
+          "admin-settings"
+        ],
+        "summary": "Manual credit adjustment (± cents; audited; SLA credits live here in v1)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "amount_cents",
+                  "reason"
+                ],
+                "properties": {
+                  "amount_cents": {
+                    "type": "integer",
+                    "description": "Positive credits, negative debits."
+                  },
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "sla",
+                      "manual"
+                    ]
+                  },
+                  "note": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 255
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New balance after the ledger entry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "balance"
+                      ],
+                      "properties": {
+                        "balance": {
+                          "$ref": "#/components/schemas/Money"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
           }
         }
       }

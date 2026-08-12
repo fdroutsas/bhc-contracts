@@ -217,6 +217,59 @@ totpRecoveryCodes:
       '429':
         $ref: '../components/responses.yaml#/RateLimited'
 
+accountsCredit:
+  post:
+    operationId: admin.accounts.credit
+    tags: [admin-settings]
+    summary: Manual credit adjustment (± cents; audited; SLA credits live here in v1)
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [amount_cents, reason]
+            properties:
+              amount_cents:
+                type: integer
+                description: Positive credits, negative debits.
+              reason:
+                type: string
+                enum: [sla, manual]
+              note:
+                type: [string, 'null']
+                maxLength: 255
+    responses:
+      '200':
+        description: New balance after the ledger entry.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [balance]
+                  properties:
+                    balance:
+                      $ref: '../components/schemas.yaml#/Money'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
 settings:
   get:
     operationId: admin.settings.index
