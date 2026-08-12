@@ -34,6 +34,10 @@
       "description": "Customer accounts, tax profile, VIES"
     },
     {
+      "name": "orders",
+      "description": "Checkout orders, proformas, payment"
+    },
+    {
       "name": "admin-auth",
       "description": "Admin authentication — TOTP is mandatory"
     },
@@ -1511,6 +1515,225 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/orders": {
+      "post": {
+        "operationId": "orders.create",
+        "tags": [
+          "orders"
+        ],
+        "summary": "Place an order (proforma issued immediately)",
+        "description": "Requires an Idempotency-Key header (stored 24h — spec §3.3): replays return the original response. Totals are computed server-side with the §7 tax resolution, including the v1.3 VIES fallback. Coupons validate server-side; the redemption is recorded against the order.\n",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "account_id",
+                  "items"
+                ],
+                "properties": {
+                  "account_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "plan_id",
+                        "cycle"
+                      ],
+                      "properties": {
+                        "plan_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "cycle": {
+                          "type": "string",
+                          "enum": [
+                            "monthly",
+                            "annually"
+                          ]
+                        },
+                        "domain": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "addon_ids": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "coupon_code": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Order placed; proforma issued (gapless PF series).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Order"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "description": "VALIDATION_FAILED, IDEMPOTENCY_KEY_REQUIRED, or BILLING_PROFILE_INCOMPLETE (tax country missing).\n",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/orders/{orderId}": {
+      "get": {
+        "operationId": "orders.show",
+        "tags": [
+          "orders"
+        ],
+        "summary": "Order details with its documents",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/components-orderId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Order"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/orders/{orderId}/cancel": {
+      "post": {
+        "operationId": "orders.cancel",
+        "tags": [
+          "orders"
+        ],
+        "summary": "Cancel a pending order (voids the proforma, frees the coupon)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/components-orderId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancelled order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Order"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "ORDER_NOT_CANCELLABLE — payment already recorded.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         }
       }
@@ -3259,6 +3482,223 @@
           }
         }
       },
+      "Totals": {
+        "type": "object",
+        "required": [
+          "net",
+          "vat",
+          "gross"
+        ],
+        "properties": {
+          "net": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "vat": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "gross": {
+            "$ref": "#/components/schemas/Money"
+          }
+        }
+      },
+      "DocumentRef": {
+        "type": "object",
+        "description": "Lightweight reference to a billing document (proforma/invoice).",
+        "required": [
+          "id",
+          "series",
+          "number",
+          "display_number",
+          "type",
+          "status",
+          "totals"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "series": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "display_number": {
+            "type": "string",
+            "examples": [
+              "PF-000001"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "invoice",
+              "proforma"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "issued",
+              "paid",
+              "overdue",
+              "void"
+            ]
+          },
+          "issue_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "due_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "mydata_mark": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pdf_available": {
+            "type": "boolean"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/Totals"
+          }
+        }
+      },
+      "Order": {
+        "type": "object",
+        "required": [
+          "id",
+          "account_id",
+          "status",
+          "tax_treatment",
+          "totals",
+          "items",
+          "documents"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "account_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_payment",
+              "under_review",
+              "paid",
+              "provisioning",
+              "completed",
+              "cancelled",
+              "failed"
+            ]
+          },
+          "tax_treatment": {
+            "type": "string",
+            "enum": [
+              "gr_standard",
+              "eu_reverse",
+              "non_eu"
+            ]
+          },
+          "vies_fallback_applied": {
+            "type": "boolean",
+            "description": "v1.3 — Greek VAT charged because VIES was unavailable/unconfirmed."
+          },
+          "coupon": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "discount": {
+                "$ref": "#/components/schemas/Money"
+              }
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/Totals"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "kind",
+                "name",
+                "cycle",
+                "totals"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "plan",
+                    "addon"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "cycle": {
+                  "type": "string",
+                  "enum": [
+                    "monthly",
+                    "annually"
+                  ]
+                },
+                "domain": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "vat_rate": {
+                  "type": "string",
+                  "examples": [
+                    "24.00"
+                  ]
+                },
+                "totals": {
+                  "$ref": "#/components/schemas/Totals"
+                }
+              }
+            }
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentRef"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "AdminPlan": {
         "type": "object",
         "required": [
@@ -3759,6 +4199,15 @@
     "parameters": {
       "components-accountId": {
         "name": "accountId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "components-orderId": {
+        "name": "orderId",
         "in": "path",
         "required": true,
         "schema": {

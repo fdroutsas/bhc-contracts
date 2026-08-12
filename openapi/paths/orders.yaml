@@ -1,0 +1,139 @@
+orders:
+  post:
+    operationId: orders.create
+    tags: [orders]
+    summary: Place an order (proforma issued immediately)
+    description: >
+      Requires an Idempotency-Key header (stored 24h — spec §3.3): replays
+      return the original response. Totals are computed server-side with the
+      §7 tax resolution, including the v1.3 VIES fallback. Coupons validate
+      server-side; the redemption is recorded against the order.
+    parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          maxLength: 255
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [account_id, items]
+            properties:
+              account_id:
+                type: string
+                format: uuid
+              items:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  required: [plan_id, cycle]
+                  properties:
+                    plan_id:
+                      type: string
+                      format: uuid
+                    cycle:
+                      type: string
+                      enum: [monthly, annually]
+                    domain:
+                      type: [string, 'null']
+                    addon_ids:
+                      type: array
+                      items:
+                        type: string
+                        format: uuid
+              coupon_code:
+                type: [string, 'null']
+    responses:
+      '201':
+        description: Order placed; proforma issued (gapless PF series).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/Order'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '422':
+        description: >
+          VALIDATION_FAILED, IDEMPOTENCY_KEY_REQUIRED, or
+          BILLING_PROFILE_INCOMPLETE (tax country missing).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+ordersKey:
+  get:
+    operationId: orders.show
+    tags: [orders]
+    summary: Order details with its documents
+    parameters:
+      - $ref: '#/components-orderId'
+    responses:
+      '200':
+        description: The order.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/Order'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+ordersCancel:
+  post:
+    operationId: orders.cancel
+    tags: [orders]
+    summary: Cancel a pending order (voids the proforma, frees the coupon)
+    parameters:
+      - $ref: '#/components-orderId'
+    responses:
+      '200':
+        description: Cancelled order.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/Order'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: ORDER_NOT_CANCELLABLE — payment already recorded.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+components-orderId:
+  name: orderId
+  in: path
+  required: true
+  schema:
+    type: string
+    format: uuid
