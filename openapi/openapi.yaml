@@ -24,6 +24,12 @@ tags:
 security:
   - cookieAuth: []
 paths:
+  /auth/register:
+    $ref: './paths/auth.yaml#/register'
+  /auth/forgot-password:
+    $ref: './paths/auth.yaml#/forgotPassword'
+  /auth/reset-password:
+    $ref: './paths/auth.yaml#/resetPassword'
   /auth/login:
     $ref: './paths/auth.yaml#/login'
   /auth/login/challenge:
@@ -70,6 +76,10 @@ components:
       $ref: './components/schemas.yaml#/ValidationProblem'
     User:
       $ref: './components/schemas.yaml#/User'
+    Account:
+      $ref: './components/schemas.yaml#/Account'
+    Money:
+      $ref: './components/schemas.yaml#/Money'
     AdminUser:
       $ref: './components/schemas.yaml#/AdminUser'
     TotpSetup:

@@ -59,6 +59,57 @@ User:
       type: string
       format: date-time
 
+Money:
+  type: object
+  description: Spec §3.3 — integer minor units, EUR only in v1.
+  required: [amount, currency]
+  properties:
+    amount:
+      type: integer
+      description: Cents.
+    currency:
+      type: string
+      const: EUR
+
+Account:
+  type: object
+  required: [id, name, type, balance]
+  properties:
+    id:
+      type: string
+      format: uuid
+    name:
+      type: string
+    type:
+      type: string
+      enum: [individual, company]
+    address_line1:
+      type: [string, 'null']
+    address_line2:
+      type: [string, 'null']
+    city:
+      type: [string, 'null']
+    postal_code:
+      type: [string, 'null']
+    country:
+      type: [string, 'null']
+      description: ISO 3166-1 alpha-2.
+    vat_number:
+      type: [string, 'null']
+    vies_valid:
+      type: [boolean, 'null']
+    vies_checked_at:
+      type: [string, 'null']
+      format: date-time
+    tax_treatment:
+      type: [string, 'null']
+      enum: [gr_standard, eu_reverse, non_eu, null]
+    balance:
+      $ref: '#/Money'
+    created_at:
+      type: string
+      format: date-time
+
 AdminUser:
   type: object
   required: [id, name, email, totp_enabled]
