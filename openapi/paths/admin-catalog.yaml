@@ -1,0 +1,481 @@
+products:
+  get:
+    operationId: admin.catalog.products.index
+    tags: [admin-catalog]
+    summary: List products (closed set, seeded)
+    responses:
+      '200':
+        description: All five product families.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/AdminProduct'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+productsKey:
+  get:
+    operationId: admin.catalog.products.show
+    tags: [admin-catalog]
+    summary: Product with its plans
+    parameters:
+      - $ref: '#/components-id'
+    responses:
+      '200':
+        description: The product, plans included.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminProduct'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+  put:
+    operationId: admin.catalog.products.update
+    tags: [admin-catalog]
+    summary: Update a product (name/active/provisioner — audited)
+    parameters:
+      - $ref: '#/components-id'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name:
+                $ref: '../components/schemas.yaml#/I18nName'
+              provisioner:
+                type: string
+                enum: [plesk, hetzner_cloud, manual]
+              active:
+                type: boolean
+    responses:
+      '200':
+        description: Updated product.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminProduct'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+plans:
+  get:
+    operationId: admin.catalog.plans.index
+    tags: [admin-catalog]
+    summary: List plans with prices
+    responses:
+      '200':
+        description: All plans.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/AdminPlan'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+  post:
+    operationId: admin.catalog.plans.create
+    tags: [admin-catalog]
+    summary: Create a plan with its prices (audited)
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/AdminPlanWrite'
+    responses:
+      '201':
+        description: Created plan.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminPlan'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+plansKey:
+  get:
+    operationId: admin.catalog.plans.show
+    tags: [admin-catalog]
+    summary: Plan details
+    parameters:
+      - $ref: '#/components-id'
+    responses:
+      '200':
+        description: The plan with prices.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminPlan'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+  put:
+    operationId: admin.catalog.plans.update
+    tags: [admin-catalog]
+    summary: Update a plan; prices are synced by cycle (audited)
+    parameters:
+      - $ref: '#/components-id'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/AdminPlanWrite'
+    responses:
+      '200':
+        description: Updated plan.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminPlan'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+  delete:
+    operationId: admin.catalog.plans.delete
+    tags: [admin-catalog]
+    summary: Delete a plan (audited)
+    parameters:
+      - $ref: '#/components-id'
+    responses:
+      '204':
+        description: Deleted.
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+addons:
+  get:
+    operationId: admin.catalog.addons.index
+    tags: [admin-catalog]
+    summary: List addons with prices
+    responses:
+      '200':
+        description: All addons.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/AdminAddon'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+  post:
+    operationId: admin.catalog.addons.create
+    tags: [admin-catalog]
+    summary: Create an addon (audited)
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/AdminAddonWrite'
+    responses:
+      '201':
+        description: Created addon.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminAddon'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+addonsKey:
+  get:
+    operationId: admin.catalog.addons.show
+    tags: [admin-catalog]
+    summary: Addon details
+    parameters:
+      - $ref: '#/components-id'
+    responses:
+      '200':
+        description: The addon with prices.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminAddon'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+  put:
+    operationId: admin.catalog.addons.update
+    tags: [admin-catalog]
+    summary: Update an addon; prices synced by cycle (audited)
+    parameters:
+      - $ref: '#/components-id'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/AdminAddonWrite'
+    responses:
+      '200':
+        description: Updated addon.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminAddon'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+  delete:
+    operationId: admin.catalog.addons.delete
+    tags: [admin-catalog]
+    summary: Delete an addon (audited)
+    parameters:
+      - $ref: '#/components-id'
+    responses:
+      '204':
+        description: Deleted.
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+coupons:
+  get:
+    operationId: admin.catalog.coupons.index
+    tags: [admin-catalog]
+    summary: List coupons (cursor-paginated, spec §3.3)
+    parameters:
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          default: 25
+    responses:
+      '200':
+        description: One page of coupons.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/AdminCoupon'
+                links:
+                  type: object
+                  additionalProperties: true
+                meta:
+                  type: object
+                  additionalProperties: true
+                  properties:
+                    next_cursor:
+                      type: [string, 'null']
+                    prev_cursor:
+                      type: [string, 'null']
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+  post:
+    operationId: admin.catalog.coupons.create
+    tags: [admin-catalog]
+    summary: Create a coupon (audited)
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/AdminCouponWrite'
+    responses:
+      '201':
+        description: Created coupon.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminCoupon'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+couponsKey:
+  get:
+    operationId: admin.catalog.coupons.show
+    tags: [admin-catalog]
+    summary: Coupon details
+    parameters:
+      - $ref: '#/components-id'
+    responses:
+      '200':
+        description: The coupon.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminCoupon'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+  put:
+    operationId: admin.catalog.coupons.update
+    tags: [admin-catalog]
+    summary: Update a coupon (audited)
+    parameters:
+      - $ref: '#/components-id'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/AdminCouponWrite'
+    responses:
+      '200':
+        description: Updated coupon.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminCoupon'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+  delete:
+    operationId: admin.catalog.coupons.delete
+    tags: [admin-catalog]
+    summary: Delete a coupon (audited)
+    parameters:
+      - $ref: '#/components-id'
+    responses:
+      '204':
+        description: Deleted.
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+components-id:
+  name: id
+  in: path
+  required: true
+  schema:
+    type: string
+    format: uuid

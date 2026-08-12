@@ -1,3 +1,243 @@
+I18nName:
+  type: object
+  description: Per-locale strings (spec §18).
+  required: [el, en]
+  properties:
+    el:
+      type: string
+    en:
+      type: string
+
+PriceWrite:
+  type: object
+  required: [cycle, price_cents]
+  properties:
+    cycle:
+      type: string
+      enum: [monthly, annually]
+    price_cents:
+      type: integer
+      minimum: 0
+    setup_cents:
+      type: integer
+      minimum: 0
+      default: 0
+    compare_at_cents:
+      type: [integer, 'null']
+      minimum: 0
+
+AdminProduct:
+  type: object
+  required: [id, key, name, provisioner, active]
+  properties:
+    id:
+      type: string
+      format: uuid
+    key:
+      type: string
+      enum: [shared, wp, woo, vps, erp]
+    name:
+      $ref: '#/I18nName'
+    provisioner:
+      type: string
+      enum: [plesk, hetzner_cloud, manual]
+    active:
+      type: boolean
+    plans:
+      type: array
+      items:
+        $ref: '#/AdminPlan'
+
+AdminPlan:
+  type: object
+  required: [id, product_id, key, name, sort, config, active, prices]
+  properties:
+    id:
+      type: string
+      format: uuid
+    product_id:
+      type: string
+      format: uuid
+    key:
+      type: string
+    name:
+      $ref: '#/I18nName'
+    sort:
+      type: integer
+    config:
+      type: object
+      additionalProperties: true
+    active:
+      type: boolean
+    prices:
+      type: array
+      items:
+        type: object
+        required: [cycle, price_cents, setup_cents]
+        properties:
+          cycle:
+            type: string
+            enum: [monthly, annually]
+          price_cents:
+            type: integer
+          setup_cents:
+            type: integer
+          compare_at_cents:
+            type: [integer, 'null']
+
+AdminPlanWrite:
+  type: object
+  required: [product_id, key, name, prices]
+  properties:
+    product_id:
+      type: string
+      format: uuid
+    key:
+      type: string
+    name:
+      $ref: '#/I18nName'
+    sort:
+      type: integer
+      default: 0
+    config:
+      type: object
+      additionalProperties: true
+    active:
+      type: boolean
+      default: true
+    prices:
+      type: array
+      minItems: 1
+      items:
+        $ref: '#/PriceWrite'
+
+AdminAddon:
+  type: object
+  required: [id, key, name, config, compatible_products, prices]
+  properties:
+    id:
+      type: string
+      format: uuid
+    key:
+      type: string
+    name:
+      $ref: '#/I18nName'
+    config:
+      type: object
+      additionalProperties: true
+    compatible_products:
+      type: array
+      items:
+        type: string
+        enum: [shared, wp, woo, vps, erp]
+    prices:
+      type: array
+      items:
+        type: object
+        required: [cycle, price_cents]
+        properties:
+          cycle:
+            type: string
+            enum: [monthly, annually]
+          price_cents:
+            type: integer
+
+AdminAddonWrite:
+  type: object
+  required: [key, name, prices]
+  properties:
+    key:
+      type: string
+    name:
+      $ref: '#/I18nName'
+    config:
+      type: object
+      additionalProperties: true
+    compatible_products:
+      type: array
+      items:
+        type: string
+        enum: [shared, wp, woo, vps, erp]
+    prices:
+      type: array
+      minItems: 1
+      items:
+        type: object
+        required: [cycle, price_cents]
+        properties:
+          cycle:
+            type: string
+            enum: [monthly, annually]
+          price_cents:
+            type: integer
+            minimum: 0
+
+AdminCoupon:
+  type: object
+  required: [id, code, type, value, active]
+  properties:
+    id:
+      type: string
+      format: uuid
+    code:
+      type: string
+    type:
+      type: string
+      enum: [percent, fixed]
+    value:
+      type: integer
+      description: Percent 1–100, or cents for fixed.
+    applies_to:
+      type: object
+      additionalProperties: true
+    max_redemptions:
+      type: [integer, 'null']
+    per_account_limit:
+      type: [integer, 'null']
+    valid_from:
+      type: [string, 'null']
+      format: date-time
+    valid_until:
+      type: [string, 'null']
+      format: date-time
+    active:
+      type: boolean
+    created_at:
+      type: string
+      format: date-time
+
+AdminCouponWrite:
+  type: object
+  required: [code, type, value]
+  properties:
+    code:
+      type: string
+      maxLength: 40
+    type:
+      type: string
+      enum: [percent, fixed]
+    value:
+      type: integer
+      minimum: 1
+    applies_to:
+      type: object
+      additionalProperties: true
+    max_redemptions:
+      type: [integer, 'null']
+      minimum: 1
+    per_account_limit:
+      type: [integer, 'null']
+      minimum: 1
+    valid_from:
+      type: [string, 'null']
+      format: date-time
+    valid_until:
+      type: [string, 'null']
+      format: date-time
+    active:
+      type: boolean
+      default: true
+
 Problem:
   type: object
   description: RFC 9457 problem details with a stable machine-readable `code`.

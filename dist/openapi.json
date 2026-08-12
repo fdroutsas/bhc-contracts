@@ -36,6 +36,10 @@
     {
       "name": "admin-settings",
       "description": "Runtime settings (registry-gated, audited)"
+    },
+    {
+      "name": "admin-catalog",
+      "description": "Catalog management (products, plans, addons, coupons — audited)"
     }
   ],
   "paths": {
@@ -1646,6 +1650,821 @@
           }
         }
       }
+    },
+    "/admin/catalog/products": {
+      "get": {
+        "operationId": "admin.catalog.products.index",
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "List products (closed set, seeded)",
+        "responses": {
+          "200": {
+            "description": "All five product families.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AdminProduct"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/admin/catalog/products/{id}": {
+      "get": {
+        "operationId": "admin.catalog.products.show",
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Product with its plans",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/components-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The product, plans included.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminProduct"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "put": {
+        "operationId": "admin.catalog.products.update",
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Update a product (name/active/provisioner — audited)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/components-id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "$ref": "#/components/schemas/I18nName"
+                  },
+                  "provisioner": {
+                    "type": "string",
+                    "enum": [
+                      "plesk",
+                      "hetzner_cloud",
+                      "manual"
+                    ]
+                  },
+                  "active": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated product.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminProduct"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/admin/catalog/plans": {
+      "get": {
+        "operationId": "admin.catalog.plans.index",
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "List plans with prices",
+        "responses": {
+          "200": {
+            "description": "All plans.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AdminPlan"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "admin.catalog.plans.create",
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Create a plan with its prices (audited)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminPlanWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created plan.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminPlan"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/admin/catalog/plans/{id}": {
+      "get": {
+        "operationId": "admin.catalog.plans.show",
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Plan details",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/components-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The plan with prices.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminPlan"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "put": {
+        "operationId": "admin.catalog.plans.update",
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Update a plan; prices are synced by cycle (audited)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/components-id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminPlanWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated plan.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminPlan"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "admin.catalog.plans.delete",
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Delete a plan (audited)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/components-id"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/admin/catalog/addons": {
+      "get": {
+        "operationId": "admin.catalog.addons.index",
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "List addons with prices",
+        "responses": {
+          "200": {
+            "description": "All addons.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AdminAddon"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "admin.catalog.addons.create",
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Create an addon (audited)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminAddonWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created addon.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminAddon"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/admin/catalog/addons/{id}": {
+      "get": {
+        "operationId": "admin.catalog.addons.show",
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Addon details",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/components-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The addon with prices.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminAddon"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "put": {
+        "operationId": "admin.catalog.addons.update",
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Update an addon; prices synced by cycle (audited)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/components-id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminAddonWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated addon.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminAddon"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "admin.catalog.addons.delete",
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Delete an addon (audited)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/components-id"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/admin/catalog/coupons": {
+      "get": {
+        "operationId": "admin.catalog.coupons.index",
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "List coupons (cursor-paginated, spec §3.3)",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of coupons.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AdminCoupon"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "properties": {
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "prev_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "admin.catalog.coupons.create",
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Create a coupon (audited)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminCouponWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created coupon.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminCoupon"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/admin/catalog/coupons/{id}": {
+      "get": {
+        "operationId": "admin.catalog.coupons.show",
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Coupon details",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/components-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The coupon.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminCoupon"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "put": {
+        "operationId": "admin.catalog.coupons.update",
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Update a coupon (audited)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/components-id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminCouponWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated coupon.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminCoupon"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "admin.catalog.coupons.delete",
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Delete a coupon (audited)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/components-id"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2058,6 +2877,458 @@
             "format": "date-time"
           }
         }
+      },
+      "I18nName": {
+        "type": "object",
+        "description": "Per-locale strings (spec §18).",
+        "required": [
+          "el",
+          "en"
+        ],
+        "properties": {
+          "el": {
+            "type": "string"
+          },
+          "en": {
+            "type": "string"
+          }
+        }
+      },
+      "AdminPlan": {
+        "type": "object",
+        "required": [
+          "id",
+          "product_id",
+          "key",
+          "name",
+          "sort",
+          "config",
+          "active",
+          "prices"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "$ref": "#/components/schemas/I18nName"
+          },
+          "sort": {
+            "type": "integer"
+          },
+          "config": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "prices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "cycle",
+                "price_cents",
+                "setup_cents"
+              ],
+              "properties": {
+                "cycle": {
+                  "type": "string",
+                  "enum": [
+                    "monthly",
+                    "annually"
+                  ]
+                },
+                "price_cents": {
+                  "type": "integer"
+                },
+                "setup_cents": {
+                  "type": "integer"
+                },
+                "compare_at_cents": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "AdminProduct": {
+        "type": "object",
+        "required": [
+          "id",
+          "key",
+          "name",
+          "provisioner",
+          "active"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string",
+            "enum": [
+              "shared",
+              "wp",
+              "woo",
+              "vps",
+              "erp"
+            ]
+          },
+          "name": {
+            "$ref": "#/components/schemas/I18nName"
+          },
+          "provisioner": {
+            "type": "string",
+            "enum": [
+              "plesk",
+              "hetzner_cloud",
+              "manual"
+            ]
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "plans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminPlan"
+            }
+          }
+        }
+      },
+      "PriceWrite": {
+        "type": "object",
+        "required": [
+          "cycle",
+          "price_cents"
+        ],
+        "properties": {
+          "cycle": {
+            "type": "string",
+            "enum": [
+              "monthly",
+              "annually"
+            ]
+          },
+          "price_cents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "setup_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          },
+          "compare_at_cents": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        }
+      },
+      "AdminPlanWrite": {
+        "type": "object",
+        "required": [
+          "product_id",
+          "key",
+          "name",
+          "prices"
+        ],
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "$ref": "#/components/schemas/I18nName"
+          },
+          "sort": {
+            "type": "integer",
+            "default": 0
+          },
+          "config": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "active": {
+            "type": "boolean",
+            "default": true
+          },
+          "prices": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/PriceWrite"
+            }
+          }
+        }
+      },
+      "AdminAddon": {
+        "type": "object",
+        "required": [
+          "id",
+          "key",
+          "name",
+          "config",
+          "compatible_products",
+          "prices"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "$ref": "#/components/schemas/I18nName"
+          },
+          "config": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "compatible_products": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "shared",
+                "wp",
+                "woo",
+                "vps",
+                "erp"
+              ]
+            }
+          },
+          "prices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "cycle",
+                "price_cents"
+              ],
+              "properties": {
+                "cycle": {
+                  "type": "string",
+                  "enum": [
+                    "monthly",
+                    "annually"
+                  ]
+                },
+                "price_cents": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      },
+      "AdminAddonWrite": {
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "prices"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "$ref": "#/components/schemas/I18nName"
+          },
+          "config": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "compatible_products": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "shared",
+                "wp",
+                "woo",
+                "vps",
+                "erp"
+              ]
+            }
+          },
+          "prices": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "cycle",
+                "price_cents"
+              ],
+              "properties": {
+                "cycle": {
+                  "type": "string",
+                  "enum": [
+                    "monthly",
+                    "annually"
+                  ]
+                },
+                "price_cents": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      },
+      "AdminCoupon": {
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "type",
+          "value",
+          "active"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "percent",
+              "fixed"
+            ]
+          },
+          "value": {
+            "type": "integer",
+            "description": "Percent 1–100, or cents for fixed."
+          },
+          "applies_to": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "max_redemptions": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "per_account_limit": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "valid_from": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "valid_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AdminCouponWrite": {
+        "type": "object",
+        "required": [
+          "code",
+          "type",
+          "value"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "percent",
+              "fixed"
+            ]
+          },
+          "value": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applies_to": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "max_redemptions": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "per_account_limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "valid_from": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "valid_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "active": {
+            "type": "boolean",
+            "default": true
+          }
+        }
       }
     },
     "responses": {
@@ -2123,6 +3394,15 @@
     "parameters": {
       "components-accountId": {
         "name": "accountId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "components-id": {
+        "name": "id",
         "in": "path",
         "required": true,
         "schema": {

@@ -23,6 +23,8 @@ tags:
     description: Admin authentication — TOTP is mandatory
   - name: admin-settings
     description: Runtime settings (registry-gated, audited)
+  - name: admin-catalog
+    description: Catalog management (products, plans, addons, coupons — audited)
 security:
   - cookieAuth: []
 paths:
@@ -78,6 +80,22 @@ paths:
     $ref: './paths/admin.yaml#/settings'
   /admin/settings/{key}:
     $ref: './paths/admin.yaml#/settingsKey'
+  /admin/catalog/products:
+    $ref: './paths/admin-catalog.yaml#/products'
+  /admin/catalog/products/{id}:
+    $ref: './paths/admin-catalog.yaml#/productsKey'
+  /admin/catalog/plans:
+    $ref: './paths/admin-catalog.yaml#/plans'
+  /admin/catalog/plans/{id}:
+    $ref: './paths/admin-catalog.yaml#/plansKey'
+  /admin/catalog/addons:
+    $ref: './paths/admin-catalog.yaml#/addons'
+  /admin/catalog/addons/{id}:
+    $ref: './paths/admin-catalog.yaml#/addonsKey'
+  /admin/catalog/coupons:
+    $ref: './paths/admin-catalog.yaml#/coupons'
+  /admin/catalog/coupons/{id}:
+    $ref: './paths/admin-catalog.yaml#/couponsKey'
 components:
   securitySchemes:
     cookieAuth:
