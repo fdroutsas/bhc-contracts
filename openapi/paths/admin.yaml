@@ -1,0 +1,245 @@
+login:
+  post:
+    operationId: admin.auth.login
+    tags: [admin-auth]
+    summary: Admin login (step 1) — no remember-me
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/LoginRequest'
+    responses:
+      '200':
+        description: >
+          Enrolled admins get two_factor_required=true (challenge next).
+          Unenrolled admins are logged in with totp_enrollment_required=true
+          and can only reach the enrollment endpoints.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [two_factor_required]
+                  properties:
+                    two_factor_required:
+                      type: boolean
+                    totp_enrollment_required:
+                      type: boolean
+                    admin:
+                      $ref: '../components/schemas.yaml#/AdminUser'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+loginChallenge:
+  post:
+    operationId: admin.auth.loginChallenge
+    tags: [admin-auth]
+    summary: Admin login (step 2 — TOTP code)
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/TotpCodeRequest'
+    responses:
+      '200':
+        description: Admin session established.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [two_factor_required, admin]
+                  properties:
+                    two_factor_required:
+                      type: boolean
+                      const: false
+                    admin:
+                      $ref: '../components/schemas.yaml#/AdminUser'
+      '422':
+        description: TOTP_INVALID or LOGIN_CHALLENGE_EXPIRED or VALIDATION_FAILED.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+logout:
+  post:
+    operationId: admin.auth.logout
+    tags: [admin-auth]
+    summary: Admin logout
+    responses:
+      '204':
+        description: Admin session dropped (customer login unaffected).
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+
+me:
+  get:
+    operationId: admin.auth.me
+    tags: [admin-auth]
+    summary: Current admin
+    responses:
+      '200':
+        description: The authenticated admin.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminUser'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+
+totpSetup:
+  post:
+    operationId: admin.auth.totpSetup
+    tags: [admin-auth]
+    summary: Begin mandatory TOTP enrollment
+    responses:
+      '200':
+        description: Pending secret generated (not yet enabled).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/TotpSetup'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '409':
+        description: TOTP_ALREADY_ENABLED.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+totpConfirm:
+  post:
+    operationId: admin.auth.totpConfirm
+    tags: [admin-auth]
+    summary: Confirm TOTP enrollment (audited)
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/TotpCodeRequest'
+    responses:
+      '200':
+        description: TOTP enabled; the admin gate opens.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [totp_enabled]
+                  properties:
+                    totp_enabled:
+                      type: boolean
+                      const: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '409':
+        description: TOTP_ALREADY_ENABLED.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '422':
+        description: TOTP_INVALID or VALIDATION_FAILED.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+settings:
+  get:
+    operationId: admin.settings.index
+    tags: [admin-settings]
+    summary: List registry settings with resolved values
+    responses:
+      '200':
+        description: Registry keys mapped to their effective values.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  additionalProperties: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+settingsKey:
+  put:
+    operationId: admin.settings.update
+    tags: [admin-settings]
+    summary: Update a registered setting (audited admin mutation)
+    parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Registry key, e.g. platform.default_locale.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [value]
+            properties:
+              value:
+                description: Validated against the key's registry rules.
+    responses:
+      '200':
+        description: Stored value after the write.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [key, value]
+                  properties:
+                    key:
+                      type: string
+                    value: {}
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'

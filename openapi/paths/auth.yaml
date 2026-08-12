@@ -1,0 +1,207 @@
+login:
+  post:
+    operationId: auth.login
+    tags: [auth]
+    summary: Customer login (step 1)
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/LoginRequest'
+    responses:
+      '200':
+        description: >
+          Either the session is established (two_factor_required=false, user
+          present) or a TOTP challenge is pending (two_factor_required=true).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [two_factor_required]
+                  properties:
+                    two_factor_required:
+                      type: boolean
+                    user:
+                      $ref: '../components/schemas.yaml#/User'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+loginChallenge:
+  post:
+    operationId: auth.loginChallenge
+    tags: [auth]
+    summary: Customer login (step 2 — TOTP code)
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/TotpCodeRequest'
+    responses:
+      '200':
+        description: Session established.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [two_factor_required, user]
+                  properties:
+                    two_factor_required:
+                      type: boolean
+                      const: false
+                    user:
+                      $ref: '../components/schemas.yaml#/User'
+      '422':
+        description: >
+          TOTP_INVALID (wrong/replayed code) or LOGIN_CHALLENGE_EXPIRED (no
+          pending login / older than 5 minutes) or VALIDATION_FAILED.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+logout:
+  post:
+    operationId: auth.logout
+    tags: [auth]
+    summary: Customer logout
+    responses:
+      '204':
+        description: Session dropped (rotated, admin login unaffected).
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+
+me:
+  get:
+    operationId: auth.me
+    tags: [auth]
+    summary: Current customer
+    responses:
+      '200':
+        description: The authenticated customer.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/User'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+
+totpSetup:
+  post:
+    operationId: auth.totpSetup
+    tags: [auth]
+    summary: Begin TOTP enrollment
+    responses:
+      '200':
+        description: Pending secret generated (not yet enabled).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/TotpSetup'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '409':
+        description: TOTP_ALREADY_ENABLED.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+totpConfirm:
+  post:
+    operationId: auth.totpConfirm
+    tags: [auth]
+    summary: Confirm TOTP enrollment with a live code
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/TotpCodeRequest'
+    responses:
+      '200':
+        description: TOTP enabled.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [totp_enabled]
+                  properties:
+                    totp_enabled:
+                      type: boolean
+                      const: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '409':
+        description: TOTP_ALREADY_ENABLED.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '422':
+        description: TOTP_INVALID or VALIDATION_FAILED.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+totp:
+  delete:
+    operationId: auth.totpDisable
+    tags: [auth]
+    summary: Disable TOTP (customers only — requires password + current code)
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [password, code]
+            properties:
+              password:
+                type: string
+              code:
+                type: string
+                pattern: '^[0-9]{6}$'
+    responses:
+      '204':
+        description: TOTP disabled; secret discarded.
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '422':
+        description: TOTP_INVALID or VALIDATION_FAILED (wrong password).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'

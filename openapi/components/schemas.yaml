@@ -1,0 +1,116 @@
+Problem:
+  type: object
+  description: RFC 9457 problem details with a stable machine-readable `code`.
+  required: [type, title, status, code, instance]
+  properties:
+    type:
+      type: string
+      format: uri
+      examples: ['https://api.bithosting.cloud/problems/not-found']
+    title:
+      type: string
+      description: Localized (el default, en via Accept-Language).
+    status:
+      type: integer
+    code:
+      type: string
+      description: Stable UPPER_SNAKE error code.
+      examples: [NOT_FOUND]
+    instance:
+      type: string
+    detail:
+      type: string
+  additionalProperties: true
+
+ValidationProblem:
+  allOf:
+    - $ref: '#/Problem'
+    - type: object
+      required: [errors]
+      properties:
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+User:
+  type: object
+  required: [id, name, email, locale, totp_enabled]
+  properties:
+    id:
+      type: string
+      format: uuid
+    name:
+      type: string
+    email:
+      type: string
+      format: email
+    locale:
+      type: string
+      enum: [el, en]
+    totp_enabled:
+      type: boolean
+    last_login_at:
+      type: [string, 'null']
+      format: date-time
+    created_at:
+      type: string
+      format: date-time
+
+AdminUser:
+  type: object
+  required: [id, name, email, totp_enabled]
+  properties:
+    id:
+      type: string
+      format: uuid
+    name:
+      type: string
+    email:
+      type: string
+      format: email
+    role:
+      type: [string, 'null']
+      description: Role key (e.g. super_admin).
+    totp_enabled:
+      type: boolean
+    last_login_at:
+      type: [string, 'null']
+      format: date-time
+    created_at:
+      type: string
+      format: date-time
+
+TotpSetup:
+  type: object
+  required: [secret, otpauth_uri]
+  properties:
+    secret:
+      type: string
+      description: Base32 TOTP secret (shown once; SPA renders the QR).
+    otpauth_uri:
+      type: string
+      format: uri
+
+LoginRequest:
+  type: object
+  required: [email, password]
+  properties:
+    email:
+      type: string
+      format: email
+    password:
+      type: string
+    remember:
+      type: boolean
+      description: Ignored on the admin surface (admins get no remember-me).
+
+TotpCodeRequest:
+  type: object
+  required: [code]
+  properties:
+    code:
+      type: string
+      pattern: '^[0-9]{6}$'

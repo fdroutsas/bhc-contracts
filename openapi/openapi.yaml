@@ -1,0 +1,91 @@
+openapi: 3.1.1
+info:
+  title: BitHosting Control Plane API
+  version: 0.1.0
+  summary: Contract-first API for bithosting.cloud (bhc-api)
+  description: >
+    OpenAPI 3.1 contract for the BitHosting control plane. The spec is the
+    source of truth: bhc-api CI fails when routes drift from this document in
+    either direction. M0 covers authentication (customer + admin, TOTP) and
+    admin settings. Errors follow RFC 9457 application/problem+json with a
+    stable `code` member.
+  contact:
+    name: Octobyte / Memoire Development E.E.
+servers:
+  - url: https://api.bithosting.cloud/api/v1
+    description: Production
+tags:
+  - name: auth
+    description: Customer authentication (portal SPA, session cookies)
+  - name: admin-auth
+    description: Admin authentication — TOTP is mandatory
+  - name: admin-settings
+    description: Runtime settings (registry-gated, audited)
+security:
+  - cookieAuth: []
+paths:
+  /auth/login:
+    $ref: './paths/auth.yaml#/login'
+  /auth/login/challenge:
+    $ref: './paths/auth.yaml#/loginChallenge'
+  /auth/logout:
+    $ref: './paths/auth.yaml#/logout'
+  /auth/me:
+    $ref: './paths/auth.yaml#/me'
+  /auth/totp/setup:
+    $ref: './paths/auth.yaml#/totpSetup'
+  /auth/totp/confirm:
+    $ref: './paths/auth.yaml#/totpConfirm'
+  /auth/totp:
+    $ref: './paths/auth.yaml#/totp'
+  /admin/auth/login:
+    $ref: './paths/admin.yaml#/login'
+  /admin/auth/login/challenge:
+    $ref: './paths/admin.yaml#/loginChallenge'
+  /admin/auth/logout:
+    $ref: './paths/admin.yaml#/logout'
+  /admin/auth/me:
+    $ref: './paths/admin.yaml#/me'
+  /admin/auth/totp/setup:
+    $ref: './paths/admin.yaml#/totpSetup'
+  /admin/auth/totp/confirm:
+    $ref: './paths/admin.yaml#/totpConfirm'
+  /admin/settings:
+    $ref: './paths/admin.yaml#/settings'
+  /admin/settings/{key}:
+    $ref: './paths/admin.yaml#/settingsKey'
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: bhc_session
+      description: >
+        Sanctum SPA session cookie. Obtain via GET /sanctum/csrf-cookie (out of
+        contract scope) and send the X-XSRF-TOKEN header on mutating requests.
+  schemas:
+    Problem:
+      $ref: './components/schemas.yaml#/Problem'
+    ValidationProblem:
+      $ref: './components/schemas.yaml#/ValidationProblem'
+    User:
+      $ref: './components/schemas.yaml#/User'
+    AdminUser:
+      $ref: './components/schemas.yaml#/AdminUser'
+    TotpSetup:
+      $ref: './components/schemas.yaml#/TotpSetup'
+    LoginRequest:
+      $ref: './components/schemas.yaml#/LoginRequest'
+    TotpCodeRequest:
+      $ref: './components/schemas.yaml#/TotpCodeRequest'
+  responses:
+    Unauthenticated:
+      $ref: './components/responses.yaml#/Unauthenticated'
+    Forbidden:
+      $ref: './components/responses.yaml#/Forbidden'
+    NotFound:
+      $ref: './components/responses.yaml#/NotFound'
+    ValidationFailed:
+      $ref: './components/responses.yaml#/ValidationFailed'
+    RateLimited:
+      $ref: './components/responses.yaml#/RateLimited'

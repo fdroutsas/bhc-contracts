@@ -1,0 +1,24 @@
+name: CI
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+
+jobs:
+    lint-and-bundle:
+        name: Lint + bundle freshness
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: '22'
+                  cache: npm
+            - run: npm ci
+            - run: npm audit --audit-level=high
+            - run: npm run lint
+            # dist/openapi.json is the committed artifact bhc-api consumes —
+            # regenerating it must produce no diff.
+            - run: npm run bundle
+            - run: git diff --exit-code dist/

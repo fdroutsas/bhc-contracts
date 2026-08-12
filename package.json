@@ -1,0 +1,15 @@
+{
+    "name": "@bithosting/bhc-contracts",
+    "version": "0.1.0",
+    "private": true,
+    "description": "OpenAPI 3.1 contract for the BitHosting Control Plane",
+    "scripts": {
+        "lint": "redocly lint openapi/openapi.yaml",
+        "bundle": "redocly bundle openapi/openapi.yaml -o dist/openapi.json",
+        "bundle:check": "npm run bundle && git diff --exit-code dist/",
+        "preview": "redocly preview-docs openapi/openapi.yaml"
+    },
+    "devDependencies": {
+        "@redocly/cli": "^2.0.0"
+    }
+}

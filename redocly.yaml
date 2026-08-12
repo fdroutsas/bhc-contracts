@@ -1,0 +1,15 @@
+extends:
+  - recommended
+
+apis:
+  bhc@v1:
+    root: openapi/openapi.yaml
+
+rules:
+  operation-operationId: error
+  operation-operationId-unique: error
+  no-unresolved-refs: error
+  no-unused-components: warn
+  operation-4xx-response: warn
+  info-license: off
+  security-defined: error

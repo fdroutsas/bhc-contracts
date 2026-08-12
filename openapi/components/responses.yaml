@@ -1,0 +1,44 @@
+Unauthenticated:
+  description: Not authenticated (code UNAUTHENTICATED).
+  content:
+    application/problem+json:
+      schema:
+        $ref: './schemas.yaml#/Problem'
+
+Forbidden:
+  description: >
+    Denied (code FORBIDDEN) — or ADMIN_TOTP_ENROLLMENT_REQUIRED when an
+    unenrolled admin touches a gated admin route.
+  content:
+    application/problem+json:
+      schema:
+        $ref: './schemas.yaml#/Problem'
+
+NotFound:
+  description: Not found (code NOT_FOUND).
+  content:
+    application/problem+json:
+      schema:
+        $ref: './schemas.yaml#/Problem'
+
+ValidationFailed:
+  description: >
+    Validation failed (code VALIDATION_FAILED) — also used for bad credentials
+    (errors.email). Domain TOTP failures use codes TOTP_INVALID or
+    LOGIN_CHALLENGE_EXPIRED with the plain Problem shape.
+  content:
+    application/problem+json:
+      schema:
+        $ref: './schemas.yaml#/ValidationProblem'
+
+RateLimited:
+  description: Throttled (code RATE_LIMITED); Retry-After header present.
+  headers:
+    Retry-After:
+      schema:
+        type: integer
+      description: Seconds until the bucket refills.
+  content:
+    application/problem+json:
+      schema:
+        $ref: './schemas.yaml#/Problem'
