@@ -1,0 +1,101 @@
+catalog:
+  get:
+    operationId: catalog.index
+    tags: [catalog]
+    summary: Public catalog tree (active products, plans, addons)
+    description: >
+      Names are resolved to the request locale (Accept-Language, el default)
+      and also returned in full under name_i18n. Prices use the Money shape.
+      Plan config is whitelisted — provisioning internals never appear here.
+    security: []
+    responses:
+      '200':
+        description: Products with plans and prices, plus addons.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [products, addons]
+                  properties:
+                    products:
+                      type: array
+                      items:
+                        type: object
+                        required: [key, name, name_i18n, plans]
+                        properties:
+                          key:
+                            type: string
+                            enum: [shared, wp, woo, vps, erp]
+                          name:
+                            type: string
+                          name_i18n:
+                            $ref: '../components/schemas.yaml#/I18nName'
+                          plans:
+                            type: array
+                            items:
+                              type: object
+                              required: [id, key, name, name_i18n, specs, prices]
+                              properties:
+                                id:
+                                  type: string
+                                  format: uuid
+                                key:
+                                  type: string
+                                name:
+                                  type: string
+                                name_i18n:
+                                  $ref: '../components/schemas.yaml#/I18nName'
+                                specs:
+                                  type: object
+                                  description: Whitelisted display attributes only.
+                                  additionalProperties: true
+                                prices:
+                                  type: array
+                                  items:
+                                    type: object
+                                    required: [cycle, price, setup]
+                                    properties:
+                                      cycle:
+                                        type: string
+                                        enum: [monthly, annually]
+                                      price:
+                                        $ref: '../components/schemas.yaml#/Money'
+                                      setup:
+                                        $ref: '../components/schemas.yaml#/Money'
+                                      compare_at:
+                                        oneOf:
+                                          - $ref: '../components/schemas.yaml#/Money'
+                                          - type: 'null'
+                    addons:
+                      type: array
+                      items:
+                        type: object
+                        required: [key, name, name_i18n, compatible_products, prices]
+                        properties:
+                          key:
+                            type: string
+                          name:
+                            type: string
+                          name_i18n:
+                            $ref: '../components/schemas.yaml#/I18nName'
+                          compatible_products:
+                            type: array
+                            items:
+                              type: string
+                          prices:
+                            type: array
+                            items:
+                              type: object
+                              required: [cycle, price]
+                              properties:
+                                cycle:
+                                  type: string
+                                  enum: [monthly, annually]
+                                price:
+                                  $ref: '../components/schemas.yaml#/Money'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'
