@@ -54,6 +54,8 @@ paths:
     $ref: './paths/auth.yaml#/totpConfirm'
   /auth/totp:
     $ref: './paths/auth.yaml#/totp'
+  /auth/totp/recovery-codes:
+    $ref: './paths/auth.yaml#/totpRecoveryCodes'
   /accounts:
     $ref: './paths/accounts.yaml#/index'
   /accounts/{accountId}:
@@ -80,6 +82,8 @@ paths:
     $ref: './paths/admin.yaml#/totpSetup'
   /admin/auth/totp/confirm:
     $ref: './paths/admin.yaml#/totpConfirm'
+  /admin/auth/totp/recovery-codes:
+    $ref: './paths/admin.yaml#/totpRecoveryCodes'
   /admin/settings:
     $ref: './paths/admin.yaml#/settings'
   /admin/settings/{key}:

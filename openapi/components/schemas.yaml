@@ -450,4 +450,20 @@ TotpCodeRequest:
   properties:
     code:
       type: string
-      pattern: '^[0-9]{6}$'
+      minLength: 6
+      maxLength: 21
+      description: >
+        6-digit TOTP code — or, on the login challenge, a one-time recovery
+        code (v1.3). Recovery codes are consumed on use.
+
+RecoveryCodes:
+  type: object
+  required: [recovery_codes]
+  properties:
+    recovery_codes:
+      type: array
+      minItems: 8
+      maxItems: 8
+      description: One-time codes, shown exactly once — store them safely.
+      items:
+        type: string
