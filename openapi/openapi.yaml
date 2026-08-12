@@ -21,6 +21,8 @@ tags:
     description: Customer authentication (portal SPA, session cookies)
   - name: accounts
     description: Customer accounts, tax profile, VIES
+  - name: orders
+    description: Checkout orders, proformas, payment
   - name: admin-auth
     description: Admin authentication — TOTP is mandatory
   - name: admin-settings
@@ -54,6 +56,8 @@ paths:
     $ref: './paths/auth.yaml#/totpConfirm'
   /auth/totp:
     $ref: './paths/auth.yaml#/totp'
+  /auth/totp/recovery-codes:
+    $ref: './paths/auth.yaml#/totpRecoveryCodes'
   /accounts:
     $ref: './paths/accounts.yaml#/index'
   /accounts/{accountId}:
@@ -68,6 +72,16 @@ paths:
     $ref: './paths/accounts.yaml#/invites'
   /accounts/{accountId}/invites/{inviteId}:
     $ref: './paths/accounts.yaml#/invitesKey'
+  /orders:
+    $ref: './paths/orders.yaml#/orders'
+  /orders/{orderId}:
+    $ref: './paths/orders.yaml#/ordersKey'
+  /orders/{orderId}/cancel:
+    $ref: './paths/orders.yaml#/ordersCancel'
+  /orders/{orderId}/checkout:
+    $ref: './paths/orders.yaml#/ordersCheckout'
+  /webhooks/payments/{provider}:
+    $ref: './paths/orders.yaml#/paymentWebhook'
   /admin/auth/login:
     $ref: './paths/admin.yaml#/login'
   /admin/auth/login/challenge:
@@ -80,6 +94,10 @@ paths:
     $ref: './paths/admin.yaml#/totpSetup'
   /admin/auth/totp/confirm:
     $ref: './paths/admin.yaml#/totpConfirm'
+  /admin/auth/totp/recovery-codes:
+    $ref: './paths/admin.yaml#/totpRecoveryCodes'
+  /admin/accounts/{id}/credit:
+    $ref: './paths/admin.yaml#/accountsCredit'
   /admin/settings:
     $ref: './paths/admin.yaml#/settings'
   /admin/settings/{key}:

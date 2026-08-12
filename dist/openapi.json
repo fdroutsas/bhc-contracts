@@ -34,6 +34,10 @@
       "description": "Customer accounts, tax profile, VIES"
     },
     {
+      "name": "orders",
+      "description": "Checkout orders, proformas, payment"
+    },
+    {
       "name": "admin-auth",
       "description": "Admin authentication — TOTP is mandatory"
     },
@@ -799,7 +803,7 @@
         },
         "responses": {
           "200": {
-            "description": "TOTP enabled.",
+            "description": "TOTP enabled; recovery codes issued (shown once — v1.3).",
             "content": {
               "application/json": {
                 "schema": {
@@ -809,16 +813,23 @@
                   ],
                   "properties": {
                     "data": {
-                      "type": "object",
-                      "required": [
-                        "totp_enabled"
-                      ],
-                      "properties": {
-                        "totp_enabled": {
-                          "type": "boolean",
-                          "const": true
+                      "allOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "totp_enabled"
+                          ],
+                          "properties": {
+                            "totp_enabled": {
+                              "type": "boolean",
+                              "const": true
+                            }
+                          }
+                        },
+                        {
+                          "$ref": "#/components/schemas/RecoveryCodes"
                         }
-                      }
+                      ]
                     }
                   }
                 }
@@ -893,6 +904,74 @@
           },
           "422": {
             "description": "TOTP_INVALID or VALIDATION_FAILED (wrong password).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/auth/totp/recovery-codes": {
+      "post": {
+        "operationId": "auth.totpRecoveryCodesRegenerate",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Regenerate recovery codes (password + live TOTP; invalidates old set)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "password",
+                  "code"
+                ],
+                "properties": {
+                  "password": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string",
+                    "pattern": "^[0-9]{6}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Fresh set of 8 one-time codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/RecoveryCodes"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "422": {
+            "description": "TOTP_INVALID or VALIDATION_FAILED (wrong password) or TOTP not enabled.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1440,6 +1519,387 @@
         }
       }
     },
+    "/orders": {
+      "post": {
+        "operationId": "orders.create",
+        "tags": [
+          "orders"
+        ],
+        "summary": "Place an order (proforma issued immediately)",
+        "description": "Requires an Idempotency-Key header (stored 24h — spec §3.3): replays return the original response. Totals are computed server-side with the §7 tax resolution, including the v1.3 VIES fallback. Coupons validate server-side; the redemption is recorded against the order.\n",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "account_id",
+                  "items"
+                ],
+                "properties": {
+                  "account_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "plan_id",
+                        "cycle"
+                      ],
+                      "properties": {
+                        "plan_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "cycle": {
+                          "type": "string",
+                          "enum": [
+                            "monthly",
+                            "annually"
+                          ]
+                        },
+                        "domain": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "addon_ids": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "coupon_code": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Order placed; proforma issued (gapless PF series).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Order"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "description": "VALIDATION_FAILED, IDEMPOTENCY_KEY_REQUIRED, or BILLING_PROFILE_INCOMPLETE (tax country missing).\n",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/orders/{orderId}": {
+      "get": {
+        "operationId": "orders.show",
+        "tags": [
+          "orders"
+        ],
+        "summary": "Order details with its documents",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/components-orderId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Order"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/orders/{orderId}/cancel": {
+      "post": {
+        "operationId": "orders.cancel",
+        "tags": [
+          "orders"
+        ],
+        "summary": "Cancel a pending order (voids the proforma, frees the coupon)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/components-orderId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancelled order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Order"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "ORDER_NOT_CANCELLABLE — payment already recorded.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/{orderId}/checkout": {
+      "post": {
+        "operationId": "orders.checkout",
+        "tags": [
+          "orders"
+        ],
+        "summary": "Create a payment session for a pending order",
+        "description": "The single third-party call allowed inline (§3.1). Part A uses the fake gateway; Part B swaps Viva/Everypay behind the same contract.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/components-orderId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Credit balance is consumed first (§7). If it fully covers the proforma the order settles immediately (status=paid, no session); otherwise a gateway session is returned for the remainder.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "status",
+                        "balance_applied"
+                      ],
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "session",
+                            "paid"
+                          ]
+                        },
+                        "balance_applied": {
+                          "$ref": "#/components/schemas/Money"
+                        },
+                        "session_id": {
+                          "type": "string"
+                        },
+                        "redirect_url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "expires_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "ORDER_NOT_PAYABLE — not pending payment anymore.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhooks/payments/{provider}": {
+      "post": {
+        "operationId": "webhooks.payments",
+        "tags": [
+          "orders"
+        ],
+        "summary": "Gateway payment callback (server-to-server)",
+        "description": "Signature-verified per provider driver; deduplicated on the provider event id (§15.4). Always answers 200 for verified events — including replays — so gateways stop retrying.\n",
+        "security": [],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "fake",
+                "viva",
+                "everypay"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Provider-specific payload; normalized by the driver.",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Acknowledged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "status"
+                      ],
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "processed",
+                            "duplicate",
+                            "ignored"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "WEBHOOK_INVALID — signature verification failed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/admin/auth/login": {
       "post": {
         "operationId": "admin.auth.login",
@@ -1676,7 +2136,7 @@
         },
         "responses": {
           "200": {
-            "description": "TOTP enabled; the admin gate opens.",
+            "description": "TOTP enabled; recovery codes issued (shown once — v1.3); the admin gate opens.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1686,16 +2146,23 @@
                   ],
                   "properties": {
                     "data": {
-                      "type": "object",
-                      "required": [
-                        "totp_enabled"
-                      ],
-                      "properties": {
-                        "totp_enabled": {
-                          "type": "boolean",
-                          "const": true
+                      "allOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "totp_enabled"
+                          ],
+                          "properties": {
+                            "totp_enabled": {
+                              "type": "boolean",
+                              "const": true
+                            }
+                          }
+                        },
+                        {
+                          "$ref": "#/components/schemas/RecoveryCodes"
                         }
-                      }
+                      ]
                     }
                   }
                 }
@@ -1727,6 +2194,168 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/admin/auth/totp/recovery-codes": {
+      "post": {
+        "operationId": "admin.auth.totpRecoveryCodesRegenerate",
+        "tags": [
+          "admin-auth"
+        ],
+        "summary": "Regenerate admin recovery codes (password + live TOTP)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "password",
+                  "code"
+                ],
+                "properties": {
+                  "password": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string",
+                    "pattern": "^[0-9]{6}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Fresh set of 8 one-time codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/RecoveryCodes"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "422": {
+            "description": "TOTP_INVALID or VALIDATION_FAILED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/admin/accounts/{id}/credit": {
+      "post": {
+        "operationId": "admin.accounts.credit",
+        "tags": [
+          "admin-settings"
+        ],
+        "summary": "Manual credit adjustment (± cents; audited; SLA credits live here in v1)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "amount_cents",
+                  "reason"
+                ],
+                "properties": {
+                  "amount_cents": {
+                    "type": "integer",
+                    "description": "Positive credits, negative debits."
+                  },
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "sla",
+                      "manual"
+                    ]
+                  },
+                  "note": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 255
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New balance after the ledger entry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "balance"
+                      ],
+                      "properties": {
+                        "balance": {
+                          "$ref": "#/components/schemas/Money"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
           }
         }
       }
@@ -2982,7 +3611,9 @@
         "properties": {
           "code": {
             "type": "string",
-            "pattern": "^[0-9]{6}$"
+            "minLength": 6,
+            "maxLength": 21,
+            "description": "6-digit TOTP code — or, on the login challenge, a one-time recovery code (v1.3). Recovery codes are consumed on use.\n"
           }
         }
       },
@@ -2999,6 +3630,23 @@
           },
           "en": {
             "type": "string"
+          }
+        }
+      },
+      "RecoveryCodes": {
+        "type": "object",
+        "required": [
+          "recovery_codes"
+        ],
+        "properties": {
+          "recovery_codes": {
+            "type": "array",
+            "minItems": 8,
+            "maxItems": 8,
+            "description": "One-time codes, shown exactly once — store them safely.",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -3083,6 +3731,223 @@
               "null"
             ],
             "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Totals": {
+        "type": "object",
+        "required": [
+          "net",
+          "vat",
+          "gross"
+        ],
+        "properties": {
+          "net": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "vat": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "gross": {
+            "$ref": "#/components/schemas/Money"
+          }
+        }
+      },
+      "DocumentRef": {
+        "type": "object",
+        "description": "Lightweight reference to a billing document (proforma/invoice).",
+        "required": [
+          "id",
+          "series",
+          "number",
+          "display_number",
+          "type",
+          "status",
+          "totals"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "series": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "display_number": {
+            "type": "string",
+            "examples": [
+              "PF-000001"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "invoice",
+              "proforma"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "issued",
+              "paid",
+              "overdue",
+              "void"
+            ]
+          },
+          "issue_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "due_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "mydata_mark": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pdf_available": {
+            "type": "boolean"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/Totals"
+          }
+        }
+      },
+      "Order": {
+        "type": "object",
+        "required": [
+          "id",
+          "account_id",
+          "status",
+          "tax_treatment",
+          "totals",
+          "items",
+          "documents"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "account_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_payment",
+              "under_review",
+              "paid",
+              "provisioning",
+              "completed",
+              "cancelled",
+              "failed"
+            ]
+          },
+          "tax_treatment": {
+            "type": "string",
+            "enum": [
+              "gr_standard",
+              "eu_reverse",
+              "non_eu"
+            ]
+          },
+          "vies_fallback_applied": {
+            "type": "boolean",
+            "description": "v1.3 — Greek VAT charged because VIES was unavailable/unconfirmed."
+          },
+          "coupon": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "discount": {
+                "$ref": "#/components/schemas/Money"
+              }
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/Totals"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "kind",
+                "name",
+                "cycle",
+                "totals"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "plan",
+                    "addon"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "cycle": {
+                  "type": "string",
+                  "enum": [
+                    "monthly",
+                    "annually"
+                  ]
+                },
+                "domain": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "vat_rate": {
+                  "type": "string",
+                  "examples": [
+                    "24.00"
+                  ]
+                },
+                "totals": {
+                  "$ref": "#/components/schemas/Totals"
+                }
+              }
+            }
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentRef"
+            }
           },
           "created_at": {
             "type": "string",
@@ -3590,6 +4455,15 @@
     "parameters": {
       "components-accountId": {
         "name": "accountId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "components-orderId": {
+        "name": "orderId",
         "in": "path",
         "required": true,
         "schema": {

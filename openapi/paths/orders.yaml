@@ -1,0 +1,239 @@
+orders:
+  post:
+    operationId: orders.create
+    tags: [orders]
+    summary: Place an order (proforma issued immediately)
+    description: >
+      Requires an Idempotency-Key header (stored 24h — spec §3.3): replays
+      return the original response. Totals are computed server-side with the
+      §7 tax resolution, including the v1.3 VIES fallback. Coupons validate
+      server-side; the redemption is recorded against the order.
+    parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          maxLength: 255
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [account_id, items]
+            properties:
+              account_id:
+                type: string
+                format: uuid
+              items:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  required: [plan_id, cycle]
+                  properties:
+                    plan_id:
+                      type: string
+                      format: uuid
+                    cycle:
+                      type: string
+                      enum: [monthly, annually]
+                    domain:
+                      type: [string, 'null']
+                    addon_ids:
+                      type: array
+                      items:
+                        type: string
+                        format: uuid
+              coupon_code:
+                type: [string, 'null']
+    responses:
+      '201':
+        description: Order placed; proforma issued (gapless PF series).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/Order'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '422':
+        description: >
+          VALIDATION_FAILED, IDEMPOTENCY_KEY_REQUIRED, or
+          BILLING_PROFILE_INCOMPLETE (tax country missing).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+ordersKey:
+  get:
+    operationId: orders.show
+    tags: [orders]
+    summary: Order details with its documents
+    parameters:
+      - $ref: '#/components-orderId'
+    responses:
+      '200':
+        description: The order.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/Order'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+ordersCancel:
+  post:
+    operationId: orders.cancel
+    tags: [orders]
+    summary: Cancel a pending order (voids the proforma, frees the coupon)
+    parameters:
+      - $ref: '#/components-orderId'
+    responses:
+      '200':
+        description: Cancelled order.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/Order'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: ORDER_NOT_CANCELLABLE — payment already recorded.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+ordersCheckout:
+  post:
+    operationId: orders.checkout
+    tags: [orders]
+    summary: Create a payment session for a pending order
+    description: >
+      The single third-party call allowed inline (§3.1). Part A uses the fake
+      gateway; Part B swaps Viva/Everypay behind the same contract.
+    parameters:
+      - $ref: '#/components-orderId'
+    responses:
+      '200':
+        description: >
+          Credit balance is consumed first (§7). If it fully covers the
+          proforma the order settles immediately (status=paid, no session);
+          otherwise a gateway session is returned for the remainder.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [status, balance_applied]
+                  properties:
+                    status:
+                      type: string
+                      enum: [session, paid]
+                    balance_applied:
+                      $ref: '../components/schemas.yaml#/Money'
+                    session_id:
+                      type: string
+                    redirect_url:
+                      type: string
+                      format: uri
+                    expires_at:
+                      type: string
+                      format: date-time
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: ORDER_NOT_PAYABLE — not pending payment anymore.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+paymentWebhook:
+  post:
+    operationId: webhooks.payments
+    tags: [orders]
+    summary: Gateway payment callback (server-to-server)
+    description: >
+      Signature-verified per provider driver; deduplicated on the provider
+      event id (§15.4). Always answers 200 for verified events — including
+      replays — so gateways stop retrying.
+    security: []
+    parameters:
+      - name: provider
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [fake, viva, everypay]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            description: Provider-specific payload; normalized by the driver.
+            additionalProperties: true
+    responses:
+      '200':
+        description: Acknowledged.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [status]
+                  properties:
+                    status:
+                      type: string
+                      enum: [processed, duplicate, ignored]
+      '403':
+        description: WEBHOOK_INVALID — signature verification failed.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+components-orderId:
+  name: orderId
+  in: path
+  required: true
+  schema:
+    type: string
+    format: uuid

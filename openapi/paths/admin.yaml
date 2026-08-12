@@ -144,7 +144,7 @@ totpConfirm:
             $ref: '../components/schemas.yaml#/TotpCodeRequest'
     responses:
       '200':
-        description: TOTP enabled; the admin gate opens.
+        description: TOTP enabled; recovery codes issued (shown once — v1.3); the admin gate opens.
         content:
           application/json:
             schema:
@@ -152,12 +152,14 @@ totpConfirm:
               required: [data]
               properties:
                 data:
-                  type: object
-                  required: [totp_enabled]
-                  properties:
-                    totp_enabled:
-                      type: boolean
-                      const: true
+                  allOf:
+                    - type: object
+                      required: [totp_enabled]
+                      properties:
+                        totp_enabled:
+                          type: boolean
+                          const: true
+                    - $ref: '../components/schemas.yaml#/RecoveryCodes'
       '401':
         $ref: '../components/responses.yaml#/Unauthenticated'
       '409':
@@ -174,6 +176,99 @@ totpConfirm:
               $ref: '../components/schemas.yaml#/Problem'
       '429':
         $ref: '../components/responses.yaml#/RateLimited'
+
+totpRecoveryCodes:
+  post:
+    operationId: admin.auth.totpRecoveryCodesRegenerate
+    tags: [admin-auth]
+    summary: Regenerate admin recovery codes (password + live TOTP)
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [password, code]
+            properties:
+              password:
+                type: string
+              code:
+                type: string
+                pattern: '^[0-9]{6}$'
+    responses:
+      '200':
+        description: Fresh set of 8 one-time codes.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/RecoveryCodes'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '422':
+        description: TOTP_INVALID or VALIDATION_FAILED.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+accountsCredit:
+  post:
+    operationId: admin.accounts.credit
+    tags: [admin-settings]
+    summary: Manual credit adjustment (± cents; audited; SLA credits live here in v1)
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [amount_cents, reason]
+            properties:
+              amount_cents:
+                type: integer
+                description: Positive credits, negative debits.
+              reason:
+                type: string
+                enum: [sla, manual]
+              note:
+                type: [string, 'null']
+                maxLength: 255
+    responses:
+      '200':
+        description: New balance after the ledger entry.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [balance]
+                  properties:
+                    balance:
+                      $ref: '../components/schemas.yaml#/Money'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
 
 settings:
   get:
