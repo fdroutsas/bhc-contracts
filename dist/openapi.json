@@ -271,6 +271,101 @@
         }
       }
     },
+    "/auth/invites/accept": {
+      "post": {
+        "operationId": "auth.invitesAccept",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Accept a team invite token",
+        "description": "Fresh (claim-invite) users must supply name + password; existing users accept with the token alone. Does not establish a session.\n",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "token"
+                ],
+                "properties": {
+                  "token": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Membership activated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "status",
+                        "account"
+                      ],
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "const": "accepted"
+                        },
+                        "account": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "name": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "INVITE_INVALID (bad/expired/used token) or VALIDATION_FAILED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
     "/auth/login": {
       "post": {
         "operationId": "auth.login",
@@ -911,6 +1006,236 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/accounts/{accountId}/members": {
+      "get": {
+        "operationId": "accounts.members.index",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Accepted team members",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/components-accountId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Members with their role.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AccountMember"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/accounts/{accountId}/members/{memberId}": {
+      "delete": {
+        "operationId": "accounts.members.remove",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Remove a member (owner/admin; owners cannot be removed)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/components-accountId"
+          },
+          {
+            "name": "memberId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Member removed."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/accounts/{accountId}/invites": {
+      "get": {
+        "operationId": "accounts.invites.index",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Pending invites",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/components-accountId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invites not yet accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AccountInvite"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "accounts.invites.create",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Invite a person by email (owner/admin)",
+        "description": "Creates a pending membership (accepted_at null) and emails a signed, TTL-bound token. Unknown emails get a claim-invite user (no password) that sets name+password on acceptance.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/components-accountId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "role"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "admin",
+                      "billing",
+                      "tech"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Invite created and email queued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AccountInvite"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/accounts/{accountId}/invites/{inviteId}": {
+      "delete": {
+        "operationId": "accounts.invites.revoke",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Revoke a pending invite (owner/admin)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/components-accountId"
+          },
+          {
+            "name": "inviteId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Invite revoked."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           }
         }
       }
@@ -1643,6 +1968,94 @@
           "code": {
             "type": "string",
             "pattern": "^[0-9]{6}$"
+          }
+        }
+      },
+      "AccountMember": {
+        "type": "object",
+        "required": [
+          "id",
+          "role",
+          "user"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "billing",
+              "tech"
+            ]
+          },
+          "accepted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "user": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "email"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              }
+            }
+          }
+        }
+      },
+      "AccountInvite": {
+        "type": "object",
+        "required": [
+          "id",
+          "role",
+          "email"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "billing",
+              "tech"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "invited_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }

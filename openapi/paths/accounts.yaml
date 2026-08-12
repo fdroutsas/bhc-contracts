@@ -163,6 +163,143 @@ viesCheck:
             schema:
               $ref: '../components/schemas.yaml#/Problem'
 
+members:
+  get:
+    operationId: accounts.members.index
+    tags: [accounts]
+    summary: Accepted team members
+    parameters:
+      - $ref: '#/components-accountId'
+    responses:
+      '200':
+        description: Members with their role.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/AccountMember'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+membersKey:
+  delete:
+    operationId: accounts.members.remove
+    tags: [accounts]
+    summary: Remove a member (owner/admin; owners cannot be removed)
+    parameters:
+      - $ref: '#/components-accountId'
+      - name: memberId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '204':
+        description: Member removed.
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+invites:
+  get:
+    operationId: accounts.invites.index
+    tags: [accounts]
+    summary: Pending invites
+    parameters:
+      - $ref: '#/components-accountId'
+    responses:
+      '200':
+        description: Invites not yet accepted.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/AccountInvite'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+  post:
+    operationId: accounts.invites.create
+    tags: [accounts]
+    summary: Invite a person by email (owner/admin)
+    description: >
+      Creates a pending membership (accepted_at null) and emails a signed,
+      TTL-bound token. Unknown emails get a claim-invite user (no password)
+      that sets name+password on acceptance.
+    parameters:
+      - $ref: '#/components-accountId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email, role]
+            properties:
+              email:
+                type: string
+                format: email
+              role:
+                type: string
+                enum: [admin, billing, tech]
+    responses:
+      '201':
+        description: Invite created and email queued.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AccountInvite'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+invitesKey:
+  delete:
+    operationId: accounts.invites.revoke
+    tags: [accounts]
+    summary: Revoke a pending invite (owner/admin)
+    parameters:
+      - $ref: '#/components-accountId'
+      - name: inviteId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '204':
+        description: Invite revoked.
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
 components-accountId:
   name: accountId
   in: path

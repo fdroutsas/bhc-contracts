@@ -133,6 +133,64 @@ resetPassword:
       '429':
         $ref: '../components/responses.yaml#/RateLimited'
 
+invitesAccept:
+  post:
+    operationId: auth.invitesAccept
+    tags: [auth]
+    summary: Accept a team invite token
+    description: >
+      Fresh (claim-invite) users must supply name + password; existing users
+      accept with the token alone. Does not establish a session.
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [token]
+            properties:
+              token:
+                type: string
+              name:
+                type: string
+              password:
+                type: string
+                minLength: 8
+    responses:
+      '200':
+        description: Membership activated.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [status, account]
+                  properties:
+                    status:
+                      type: string
+                      const: accepted
+                    account:
+                      type: object
+                      required: [id, name]
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        name:
+                          type: string
+      '422':
+        description: INVITE_INVALID (bad/expired/used token) or VALIDATION_FAILED.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'
+
 login:
   post:
     operationId: auth.login

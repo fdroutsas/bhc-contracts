@@ -32,6 +32,8 @@ paths:
     $ref: './paths/auth.yaml#/forgotPassword'
   /auth/reset-password:
     $ref: './paths/auth.yaml#/resetPassword'
+  /auth/invites/accept:
+    $ref: './paths/auth.yaml#/invitesAccept'
   /auth/login:
     $ref: './paths/auth.yaml#/login'
   /auth/login/challenge:
@@ -52,6 +54,14 @@ paths:
     $ref: './paths/accounts.yaml#/show'
   /vies/check:
     $ref: './paths/accounts.yaml#/viesCheck'
+  /accounts/{accountId}/members:
+    $ref: './paths/accounts.yaml#/members'
+  /accounts/{accountId}/members/{memberId}:
+    $ref: './paths/accounts.yaml#/membersKey'
+  /accounts/{accountId}/invites:
+    $ref: './paths/accounts.yaml#/invites'
+  /accounts/{accountId}/invites/{inviteId}:
+    $ref: './paths/accounts.yaml#/invitesKey'
   /admin/auth/login:
     $ref: './paths/admin.yaml#/login'
   /admin/auth/login/challenge:

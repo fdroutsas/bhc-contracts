@@ -110,6 +110,52 @@ Account:
       type: string
       format: date-time
 
+AccountMember:
+  type: object
+  required: [id, role, user]
+  properties:
+    id:
+      type: string
+      format: uuid
+    role:
+      type: string
+      enum: [owner, admin, billing, tech]
+    accepted_at:
+      type: [string, 'null']
+      format: date-time
+    user:
+      type: object
+      required: [id, name, email]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+
+AccountInvite:
+  type: object
+  required: [id, role, email]
+  properties:
+    id:
+      type: string
+      format: uuid
+    role:
+      type: string
+      enum: [admin, billing, tech]
+    email:
+      type: string
+      format: email
+    invited_by:
+      type: [string, 'null']
+      format: uuid
+    created_at:
+      type: string
+      format: date-time
+
 AdminUser:
   type: object
   required: [id, name, email, totp_enabled]
