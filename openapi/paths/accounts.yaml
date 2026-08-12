@@ -1,0 +1,172 @@
+index:
+  get:
+    operationId: accounts.index
+    tags: [accounts]
+    summary: My account memberships
+    responses:
+      '200':
+        description: Accounts the current user belongs to, with their role.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    required: [role, account]
+                    properties:
+                      role:
+                        type: string
+                        enum: [owner, admin, billing, tech]
+                      accepted_at:
+                        type: [string, 'null']
+                        format: date-time
+                      account:
+                        $ref: '../components/schemas.yaml#/Account'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+
+show:
+  get:
+    operationId: accounts.show
+    tags: [accounts]
+    summary: Account details
+    parameters:
+      - $ref: '#/components-accountId'
+    responses:
+      '200':
+        description: The account (members only).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/Account'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+  put:
+    operationId: accounts.update
+    tags: [accounts]
+    summary: Update billing details / tax profile (owner, admin or billing role)
+    description: >
+      Saving a VAT number for an EU country triggers a VIES validation and
+      recomputes tax_treatment (GR → gr_standard; EU + valid VIES →
+      eu_reverse; EU without valid VIES → gr_standard; anything else →
+      non_eu). When VIES is unreachable the profile still saves with
+      vies_valid=null.
+    parameters:
+      - $ref: '#/components-accountId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+              type:
+                type: string
+                enum: [individual, company]
+              address_line1:
+                type: [string, 'null']
+              address_line2:
+                type: [string, 'null']
+              city:
+                type: [string, 'null']
+              postal_code:
+                type: [string, 'null']
+              country:
+                type: [string, 'null']
+                description: ISO 3166-1 alpha-2.
+              vat_number:
+                type: [string, 'null']
+    responses:
+      '200':
+        description: Updated account with recomputed tax fields.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/Account'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+viesCheck:
+  post:
+    operationId: vies.check
+    tags: [accounts]
+    summary: Validate an EU VAT number against VIES (cached with TTL)
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [country, vat_number]
+            properties:
+              country:
+                type: string
+                description: ISO 3166-1 alpha-2 EU member state (GR maps to VIES EL).
+              vat_number:
+                type: string
+    responses:
+      '200':
+        description: VIES verdict (served from cache inside the TTL).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [valid, checked_at]
+                  properties:
+                    valid:
+                      type: boolean
+                    name:
+                      type: [string, 'null']
+                    address:
+                      type: [string, 'null']
+                    checked_at:
+                      type: string
+                      format: date-time
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'
+      '503':
+        description: VIES_UNAVAILABLE — the EU service did not answer.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+components-accountId:
+  name: accountId
+  in: path
+  required: true
+  schema:
+    type: string
+    format: uuid

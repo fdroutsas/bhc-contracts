@@ -17,6 +17,8 @@ servers:
 tags:
   - name: auth
     description: Customer authentication (portal SPA, session cookies)
+  - name: accounts
+    description: Customer accounts, tax profile, VIES
   - name: admin-auth
     description: Admin authentication — TOTP is mandatory
   - name: admin-settings
@@ -44,6 +46,12 @@ paths:
     $ref: './paths/auth.yaml#/totpConfirm'
   /auth/totp:
     $ref: './paths/auth.yaml#/totp'
+  /accounts:
+    $ref: './paths/accounts.yaml#/index'
+  /accounts/{accountId}:
+    $ref: './paths/accounts.yaml#/show'
+  /vies/check:
+    $ref: './paths/accounts.yaml#/viesCheck'
   /admin/auth/login:
     $ref: './paths/admin.yaml#/login'
   /admin/auth/login/challenge:
