@@ -1738,6 +1738,159 @@
         }
       }
     },
+    "/orders/{orderId}/checkout": {
+      "post": {
+        "operationId": "orders.checkout",
+        "tags": [
+          "orders"
+        ],
+        "summary": "Create a payment session for a pending order",
+        "description": "The single third-party call allowed inline (§3.1). Part A uses the fake gateway; Part B swaps Viva/Everypay behind the same contract.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/components-orderId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Gateway checkout session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "session_id",
+                        "redirect_url",
+                        "expires_at"
+                      ],
+                      "properties": {
+                        "session_id": {
+                          "type": "string"
+                        },
+                        "redirect_url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "expires_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "ORDER_NOT_PAYABLE — not pending payment anymore.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhooks/payments/{provider}": {
+      "post": {
+        "operationId": "webhooks.payments",
+        "tags": [
+          "orders"
+        ],
+        "summary": "Gateway payment callback (server-to-server)",
+        "description": "Signature-verified per provider driver; deduplicated on the provider event id (§15.4). Always answers 200 for verified events — including replays — so gateways stop retrying.\n",
+        "security": [],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "fake",
+                "viva",
+                "everypay"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Provider-specific payload; normalized by the driver.",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Acknowledged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "status"
+                      ],
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "processed",
+                            "duplicate",
+                            "ignored"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "WEBHOOK_INVALID — signature verification failed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/admin/auth/login": {
       "post": {
         "operationId": "admin.auth.login",
