@@ -1820,6 +1820,60 @@
       }
     },
     "/webhooks/payments/{provider}": {
+      "get": {
+        "operationId": "webhooks.payments.verify",
+        "tags": [
+          "orders"
+        ],
+        "summary": "Webhook endpoint verification handshake",
+        "description": "Some gateways (Viva) verify a webhook URL with a GET request that must echo a provider-issued verification key. Responds only when {provider} is the active gateway and its driver supports the handshake; 404 otherwise. The response shape follows the provider's expectation (Viva: `{\"Key\": \"...\"}`).\n",
+        "security": [],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "fake",
+                "viva",
+                "everypay"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verification key for the provider's handshake.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "Key"
+                  ],
+                  "properties": {
+                    "Key": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown provider or handshake unsupported.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "operationId": "webhooks.payments",
         "tags": [
