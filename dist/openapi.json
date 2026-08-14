@@ -48,6 +48,18 @@
     {
       "name": "admin-catalog",
       "description": "Catalog management (products, plans, addons, coupons — audited)"
+    },
+    {
+      "name": "services",
+      "description": "Customer services — read + SSO only in v1 (M3)"
+    },
+    {
+      "name": "admin-infra",
+      "description": "Servers, provisioning monitor, reconciliation (M3 — audited)"
+    },
+    {
+      "name": "nodes",
+      "description": "Golden-node self-registration over WireGuard (spec §16)"
     }
   ],
   "paths": {
@@ -2034,6 +2046,1113 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/services": {
+      "get": {
+        "operationId": "services.index",
+        "tags": [
+          "services"
+        ],
+        "summary": "List the services of an account (member-gated)",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of services.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Service"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/services/{serviceId}": {
+      "get": {
+        "operationId": "services.show",
+        "tags": [
+          "services"
+        ],
+        "summary": "Service detail with the provisioning timeline",
+        "parameters": [
+          {
+            "name": "serviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The service (timeline mirrors the account channel events).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Service"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/services/{serviceId}/sso": {
+      "post": {
+        "operationId": "services.sso",
+        "tags": [
+          "services"
+        ],
+        "summary": "Issue a one-time control-panel SSO link (short TTL, audited)",
+        "description": "Target `panel` only in v1 (spec §5 ssoUrl); `wp_admin` and `console` arrive with M7. Each issuance is audit-logged against the actor.\n",
+        "parameters": [
+          {
+            "name": "serviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "target"
+                ],
+                "properties": {
+                  "target": {
+                    "type": "string",
+                    "enum": [
+                      "panel"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Short-lived signed URL.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/SsoLink"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Service is not in a state that can be entered (SERVICE_NOT_ACTIVE).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/nodes/register": {
+      "post": {
+        "operationId": "nodes.register",
+        "tags": [
+          "nodes"
+        ],
+        "summary": "Node self-registration (bootstrap token, WG-only)",
+        "description": "Authenticated by the per-provisioning bootstrap token — not a session. The node lands in `maintenance` status until an admin activates it; the posted Plesk API key is stored encrypted and never echoed back.\n",
+        "security": [],
+        "parameters": [
+          {
+            "name": "X-Node-Bootstrap-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NodeRegisterWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Server row created in maintenance status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminServer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/admin/servers": {
+      "get": {
+        "operationId": "admin.infra.servers.index",
+        "tags": [
+          "admin-infra"
+        ],
+        "summary": "List servers (cursor-paginated)",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of servers with health and capacity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AdminServer"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "admin.infra.servers.create",
+        "tags": [
+          "admin-infra"
+        ],
+        "summary": "Register a server (audited)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminServerWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Server created (status defaults to maintenance).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminServer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/admin/servers/{serverId}": {
+      "get": {
+        "operationId": "admin.infra.servers.show",
+        "tags": [
+          "admin-infra"
+        ],
+        "summary": "Server detail (health, capacity, utilization)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/serverId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The server.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminServer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "put": {
+        "operationId": "admin.infra.servers.update",
+        "tags": [
+          "admin-infra"
+        ],
+        "summary": "Update a server (status transitions incl. drain — audited)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/serverId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminServerWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated server.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminServer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "admin.infra.servers.delete",
+        "tags": [
+          "admin-infra"
+        ],
+        "summary": "Remove a server (only when offline and hosting nothing — audited)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/serverId"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Server still active or hosting services (SERVER_NOT_REMOVABLE).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/servers/{serverId}/ips": {
+      "get": {
+        "operationId": "admin.infra.servers.ips.index",
+        "tags": [
+          "admin-infra"
+        ],
+        "summary": "IP inventory of a server",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/serverId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All IPs with their assignments.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ServerIp"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "post": {
+        "operationId": "admin.infra.servers.ips.add",
+        "tags": [
+          "admin-infra"
+        ],
+        "summary": "Add an IP to the inventory (audited)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/serverId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServerIpWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "IP added.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ServerIp"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/admin/servers/{serverId}/ips/{ipId}": {
+      "delete": {
+        "operationId": "admin.infra.servers.ips.remove",
+        "tags": [
+          "admin-infra"
+        ],
+        "summary": "Remove an unassigned IP (audited)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/serverId"
+          },
+          {
+            "name": "ipId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "IP is assigned to a service (IP_ASSIGNED).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/servers/{serverId}/plan-maps": {
+      "get": {
+        "operationId": "admin.infra.servers.planMaps.index",
+        "tags": [
+          "admin-infra"
+        ],
+        "summary": "Plan ↔ Plesk service-plan mappings of a node",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/serverId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current mappings (provisioning hard-fails on missing ones).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PlanMap"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/admin/servers/{serverId}/plan-maps/sync": {
+      "post": {
+        "operationId": "admin.infra.servers.planMaps.sync",
+        "tags": [
+          "admin-infra"
+        ],
+        "summary": "Pull service plans from the node and re-map (audited)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/serverId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sync result — mapped plans and plans missing on the node.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/PlanMapSyncResult"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "502": {
+            "description": "Node unreachable (NODE_UNREACHABLE).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/servers/{serverId}/reconcile": {
+      "post": {
+        "operationId": "admin.infra.servers.reconcile",
+        "tags": [
+          "admin-infra"
+        ],
+        "summary": "Queue an on-demand reconciliation run for a node (§6.3)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/serverId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Reconciliation queued; findings land in the queue."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/admin/provision-tasks": {
+      "get": {
+        "operationId": "admin.infra.tasks.index",
+        "tags": [
+          "admin-infra"
+        ],
+        "summary": "Provisioning monitor (cursor-paginated, filterable)",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "running",
+                "failed",
+                "completed"
+              ]
+            }
+          },
+          {
+            "name": "service_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of provision tasks.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProvisionTask"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/admin/provision-tasks/{taskId}": {
+      "get": {
+        "operationId": "admin.infra.tasks.show",
+        "tags": [
+          "admin-infra"
+        ],
+        "summary": "Task detail with the full step timeline",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/taskId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The task.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ProvisionTask"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/admin/provision-tasks/{taskId}/retry": {
+      "post": {
+        "operationId": "admin.infra.tasks.retry",
+        "tags": [
+          "admin-infra"
+        ],
+        "summary": "Retry a failed task — resumes from the last completed step (audited)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/taskId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Retry queued."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Task is not in a retryable state (TASK_NOT_RETRYABLE).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/reconciliation/findings": {
+      "get": {
+        "operationId": "admin.infra.recon.index",
+        "tags": [
+          "admin-infra"
+        ],
+        "summary": "Reconciliation findings queue (never auto-destructive, §6.3)",
+        "parameters": [
+          {
+            "name": "server_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "orphan_on_node",
+                "missing_on_node",
+                "quota_drift",
+                "usage"
+              ]
+            }
+          },
+          {
+            "name": "unresolved",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of findings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ReconFinding"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/admin/reconciliation/findings/{findingId}/resolve": {
+      "post": {
+        "operationId": "admin.infra.recon.resolve",
+        "tags": [
+          "admin-infra"
+        ],
+        "summary": "Mark a finding as resolved (audited)",
+        "parameters": [
+          {
+            "name": "findingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resolved finding.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ReconFinding"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           }
         }
       }
@@ -4093,6 +5212,622 @@
           }
         }
       },
+      "Service": {
+        "type": "object",
+        "description": "Customer view — external refs and node internals never leak.",
+        "required": [
+          "id",
+          "account_id",
+          "product_key",
+          "plan",
+          "status",
+          "cycle",
+          "price",
+          "addons"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "account_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product_key": {
+            "type": "string",
+            "enum": [
+              "shared",
+              "wp",
+              "woo",
+              "vps",
+              "erp"
+            ]
+          },
+          "plan": {
+            "type": "object",
+            "required": [
+              "key",
+              "name"
+            ],
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "name": {
+                "$ref": "#/components/schemas/I18nName"
+              }
+            }
+          },
+          "domain": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "provisioning",
+              "active",
+              "suspended",
+              "terminated",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "cycle": {
+            "type": "string",
+            "enum": [
+              "monthly",
+              "annually"
+            ]
+          },
+          "price": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "next_due_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "suspended_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "addons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "key",
+                "name",
+                "price"
+              ],
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "name": {
+                  "$ref": "#/components/schemas/I18nName"
+                },
+                "price": {
+                  "$ref": "#/components/schemas/Money"
+                }
+              }
+            }
+          },
+          "timeline": {
+            "type": "array",
+            "description": "Present on show — latest provisioning task steps.",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SsoLink": {
+        "type": "object",
+        "required": [
+          "url",
+          "target",
+          "expires_at"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "target": {
+            "type": "string",
+            "enum": [
+              "panel"
+            ]
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ServerCapacity": {
+        "type": "object",
+        "description": "Allocator inputs (spec §6.1). Headroom = allocatable_gb × oversub_ratio.",
+        "required": [
+          "max_accounts",
+          "allocatable_gb",
+          "oversub_ratio"
+        ],
+        "properties": {
+          "max_accounts": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "allocatable_gb": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "oversub_ratio": {
+            "type": "number",
+            "minimum": 1
+          }
+        }
+      },
+      "NodeRegisterWrite": {
+        "type": "object",
+        "required": [
+          "name",
+          "role",
+          "hostname",
+          "wg_ip",
+          "plesk_api_key"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "shared",
+              "wp"
+            ]
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "wg_ip": {
+            "type": "string"
+          },
+          "public_ips": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "plesk_api_key": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "capacity": {
+            "$ref": "#/components/schemas/ServerCapacity"
+          }
+        }
+      },
+      "AdminServer": {
+        "type": "object",
+        "description": "plesk_api_key is write-only and never appears here.",
+        "required": [
+          "id",
+          "name",
+          "role",
+          "provisioner",
+          "hostname",
+          "wg_ip",
+          "public_ips",
+          "capacity",
+          "status",
+          "health"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "shared",
+              "wp",
+              "vps_region_ref",
+              "erp"
+            ]
+          },
+          "provisioner": {
+            "type": "string",
+            "enum": [
+              "plesk",
+              "hetzner_cloud",
+              "manual"
+            ]
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "wg_ip": {
+            "type": "string"
+          },
+          "public_ips": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "capacity": {
+            "$ref": "#/components/schemas/ServerCapacity"
+          },
+          "monthly_license_cents": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "monthly_hw_cents": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "draining",
+              "maintenance",
+              "offline"
+            ]
+          },
+          "health": {
+            "type": "object",
+            "description": "Last healthcheck snapshot (reachable, disk_pct, load, checked_at).",
+            "additionalProperties": true
+          },
+          "services_count": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AdminServerWrite": {
+        "type": "object",
+        "required": [
+          "name",
+          "role",
+          "provisioner",
+          "hostname",
+          "wg_ip",
+          "capacity"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "shared",
+              "wp",
+              "vps_region_ref",
+              "erp"
+            ]
+          },
+          "provisioner": {
+            "type": "string",
+            "enum": [
+              "plesk",
+              "hetzner_cloud",
+              "manual"
+            ]
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "wg_ip": {
+            "type": "string"
+          },
+          "public_ips": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "plesk_api_key": {
+            "type": "string",
+            "writeOnly": true,
+            "description": "Stored encrypted; omit on update to keep the current key."
+          },
+          "capacity": {
+            "$ref": "#/components/schemas/ServerCapacity"
+          },
+          "monthly_license_cents": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "monthly_hw_cents": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "draining",
+              "maintenance",
+              "offline"
+            ]
+          }
+        }
+      },
+      "ServerIp": {
+        "type": "object",
+        "required": [
+          "id",
+          "ip",
+          "kind"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ip": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "shared",
+              "dedicated"
+            ]
+          },
+          "assigned_service_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "ServerIpWrite": {
+        "type": "object",
+        "required": [
+          "ip",
+          "kind"
+        ],
+        "properties": {
+          "ip": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "shared",
+              "dedicated"
+            ]
+          }
+        }
+      },
+      "PlanMap": {
+        "type": "object",
+        "required": [
+          "id",
+          "plan_key",
+          "plesk_plan_id",
+          "plesk_plan_name",
+          "synced_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "plan_key": {
+            "type": "string"
+          },
+          "plesk_plan_id": {
+            "type": "string"
+          },
+          "plesk_plan_name": {
+            "type": "string"
+          },
+          "synced_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PlanMapSyncResult": {
+        "type": "object",
+        "required": [
+          "mapped",
+          "missing"
+        ],
+        "properties": {
+          "mapped": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanMap"
+            }
+          },
+          "missing": {
+            "type": "array",
+            "description": "Active plan keys with no matching service plan on the node.",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ProvisionTask": {
+        "type": "object",
+        "required": [
+          "id",
+          "service_id",
+          "action",
+          "status",
+          "attempt",
+          "timeline"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "service_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "provision",
+              "suspend",
+              "unsuspend",
+              "terminate",
+              "change_plan",
+              "import"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "failed",
+              "completed"
+            ]
+          },
+          "attempt": {
+            "type": "integer"
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timeline": {
+            "type": "array",
+            "description": "Append-only step log (§6.2), broadcast on account.{uuid}.",
+            "items": {
+              "type": "object",
+              "required": [
+                "step",
+                "status",
+                "at"
+              ],
+              "properties": {
+                "step": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "started",
+                    "completed",
+                    "skipped",
+                    "failed"
+                  ]
+                },
+                "at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "note": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ReconFinding": {
+        "type": "object",
+        "required": [
+          "id",
+          "server_id",
+          "kind",
+          "payload",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "server_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "orphan_on_node",
+              "missing_on_node",
+              "quota_drift",
+              "usage"
+            ]
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "resolved_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "AdminPlan": {
         "type": "object",
         "required": [
@@ -4602,6 +6337,24 @@
       },
       "components-orderId": {
         "name": "orderId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "serverId": {
+        "name": "serverId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "taskId": {
+        "name": "taskId",
         "in": "path",
         "required": true,
         "schema": {

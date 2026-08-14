@@ -29,6 +29,12 @@ tags:
     description: Runtime settings (registry-gated, audited)
   - name: admin-catalog
     description: Catalog management (products, plans, addons, coupons — audited)
+  - name: services
+    description: Customer services — read + SSO only in v1 (M3)
+  - name: admin-infra
+    description: Servers, provisioning monitor, reconciliation (M3 — audited)
+  - name: nodes
+    description: Golden-node self-registration over WireGuard (spec §16)
 security:
   - cookieAuth: []
 paths:
@@ -84,6 +90,38 @@ paths:
     $ref: './paths/orders.yaml#/ordersCheckoutConfirm'
   /webhooks/payments/{provider}:
     $ref: './paths/orders.yaml#/paymentWebhook'
+  /services:
+    $ref: './paths/services.yaml#/services'
+  /services/{serviceId}:
+    $ref: './paths/services.yaml#/servicesKey'
+  /services/{serviceId}/sso:
+    $ref: './paths/services.yaml#/servicesSso'
+  /nodes/register:
+    $ref: './paths/nodes.yaml#/register'
+  /admin/servers:
+    $ref: './paths/admin-infra.yaml#/servers'
+  /admin/servers/{serverId}:
+    $ref: './paths/admin-infra.yaml#/serversKey'
+  /admin/servers/{serverId}/ips:
+    $ref: './paths/admin-infra.yaml#/serverIps'
+  /admin/servers/{serverId}/ips/{ipId}:
+    $ref: './paths/admin-infra.yaml#/serverIpsKey'
+  /admin/servers/{serverId}/plan-maps:
+    $ref: './paths/admin-infra.yaml#/serverPlanMaps'
+  /admin/servers/{serverId}/plan-maps/sync:
+    $ref: './paths/admin-infra.yaml#/serverPlanMapsSync'
+  /admin/servers/{serverId}/reconcile:
+    $ref: './paths/admin-infra.yaml#/serverReconcile'
+  /admin/provision-tasks:
+    $ref: './paths/admin-infra.yaml#/provisionTasks'
+  /admin/provision-tasks/{taskId}:
+    $ref: './paths/admin-infra.yaml#/provisionTasksKey'
+  /admin/provision-tasks/{taskId}/retry:
+    $ref: './paths/admin-infra.yaml#/provisionTasksRetry'
+  /admin/reconciliation/findings:
+    $ref: './paths/admin-infra.yaml#/reconFindings'
+  /admin/reconciliation/findings/{findingId}/resolve:
+    $ref: './paths/admin-infra.yaml#/reconFindingsResolve'
   /admin/auth/login:
     $ref: './paths/admin.yaml#/login'
   /admin/auth/login/challenge:
