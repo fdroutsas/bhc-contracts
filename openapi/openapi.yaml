@@ -80,6 +80,8 @@ paths:
     $ref: './paths/orders.yaml#/ordersCancel'
   /orders/{orderId}/checkout:
     $ref: './paths/orders.yaml#/ordersCheckout'
+  /orders/{orderId}/checkout/confirm:
+    $ref: './paths/orders.yaml#/ordersCheckoutConfirm'
   /webhooks/payments/{provider}:
     $ref: './paths/orders.yaml#/paymentWebhook'
   /admin/auth/login:
