@@ -572,3 +572,318 @@ RecoveryCodes:
       description: One-time codes, shown exactly once — store them safely.
       items:
         type: string
+
+ServerCapacity:
+  type: object
+  description: Allocator inputs (spec §6.1). Headroom = allocatable_gb × oversub_ratio.
+  required: [max_accounts, allocatable_gb, oversub_ratio]
+  properties:
+    max_accounts:
+      type: integer
+      minimum: 1
+    allocatable_gb:
+      type: integer
+      minimum: 1
+    oversub_ratio:
+      type: number
+      minimum: 1
+
+AdminServer:
+  type: object
+  description: plesk_api_key is write-only and never appears here.
+  required: [id, name, role, provisioner, hostname, wg_ip, public_ips, capacity, status, health]
+  properties:
+    id:
+      type: string
+      format: uuid
+    name:
+      type: string
+    role:
+      type: string
+      enum: [shared, wp, vps_region_ref, erp]
+    provisioner:
+      type: string
+      enum: [plesk, hetzner_cloud, manual]
+    hostname:
+      type: string
+    wg_ip:
+      type: string
+    public_ips:
+      type: array
+      items:
+        type: string
+    capacity:
+      $ref: '#/ServerCapacity'
+    monthly_license_cents:
+      type: [integer, 'null']
+    monthly_hw_cents:
+      type: [integer, 'null']
+    status:
+      type: string
+      enum: [active, draining, maintenance, offline]
+    health:
+      type: object
+      description: Last healthcheck snapshot (reachable, disk_pct, load, checked_at).
+      additionalProperties: true
+    services_count:
+      type: integer
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+
+AdminServerWrite:
+  type: object
+  required: [name, role, provisioner, hostname, wg_ip, capacity]
+  properties:
+    name:
+      type: string
+    role:
+      type: string
+      enum: [shared, wp, vps_region_ref, erp]
+    provisioner:
+      type: string
+      enum: [plesk, hetzner_cloud, manual]
+    hostname:
+      type: string
+    wg_ip:
+      type: string
+    public_ips:
+      type: array
+      items:
+        type: string
+    plesk_api_key:
+      type: string
+      writeOnly: true
+      description: Stored encrypted; omit on update to keep the current key.
+    capacity:
+      $ref: '#/ServerCapacity'
+    monthly_license_cents:
+      type: [integer, 'null']
+    monthly_hw_cents:
+      type: [integer, 'null']
+    status:
+      type: string
+      enum: [active, draining, maintenance, offline]
+
+ServerIp:
+  type: object
+  required: [id, ip, kind]
+  properties:
+    id:
+      type: string
+      format: uuid
+    ip:
+      type: string
+    kind:
+      type: string
+      enum: [shared, dedicated]
+    assigned_service_id:
+      type: [string, 'null']
+      format: uuid
+
+ServerIpWrite:
+  type: object
+  required: [ip, kind]
+  properties:
+    ip:
+      type: string
+    kind:
+      type: string
+      enum: [shared, dedicated]
+
+PlanMap:
+  type: object
+  required: [id, plan_key, plesk_plan_id, plesk_plan_name, synced_at]
+  properties:
+    id:
+      type: string
+      format: uuid
+    plan_key:
+      type: string
+    plesk_plan_id:
+      type: string
+    plesk_plan_name:
+      type: string
+    synced_at:
+      type: string
+      format: date-time
+
+PlanMapSyncResult:
+  type: object
+  required: [mapped, missing]
+  properties:
+    mapped:
+      type: array
+      items:
+        $ref: '#/PlanMap'
+    missing:
+      type: array
+      description: Active plan keys with no matching service plan on the node.
+      items:
+        type: string
+
+ProvisionTask:
+  type: object
+  required: [id, service_id, action, status, attempt, timeline]
+  properties:
+    id:
+      type: string
+      format: uuid
+    service_id:
+      type: string
+      format: uuid
+    action:
+      type: string
+      enum: [provision, suspend, unsuspend, terminate, change_plan, import]
+    status:
+      type: string
+      enum: [pending, running, failed, completed]
+    attempt:
+      type: integer
+    last_error:
+      type: [string, 'null']
+    timeline:
+      type: array
+      description: Append-only step log (§6.2), broadcast on account.{uuid}.
+      items:
+        type: object
+        required: [step, status, at]
+        properties:
+          step:
+            type: string
+          status:
+            type: string
+            enum: [started, completed, skipped, failed]
+          at:
+            type: string
+            format: date-time
+          note:
+            type: string
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+
+ReconFinding:
+  type: object
+  required: [id, server_id, kind, payload, created_at]
+  properties:
+    id:
+      type: string
+      format: uuid
+    server_id:
+      type: string
+      format: uuid
+    kind:
+      type: string
+      enum: [orphan_on_node, missing_on_node, quota_drift, usage]
+    payload:
+      type: object
+      additionalProperties: true
+    resolved_at:
+      type: [string, 'null']
+      format: date-time
+    created_at:
+      type: string
+      format: date-time
+
+Service:
+  type: object
+  description: Customer view — external refs and node internals never leak.
+  required: [id, account_id, product_key, plan, status, cycle, price, addons]
+  properties:
+    id:
+      type: string
+      format: uuid
+    account_id:
+      type: string
+      format: uuid
+    product_key:
+      type: string
+      enum: [shared, wp, woo, vps, erp]
+    plan:
+      type: object
+      required: [key, name]
+      properties:
+        key:
+          type: string
+        name:
+          $ref: '#/I18nName'
+    domain:
+      type: [string, 'null']
+    status:
+      type: string
+      enum: [pending, provisioning, active, suspended, terminated, failed, cancelled]
+    cycle:
+      type: string
+      enum: [monthly, annually]
+    price:
+      $ref: '#/Money'
+    next_due_at:
+      type: [string, 'null']
+      format: date-time
+    suspended_reason:
+      type: [string, 'null']
+    addons:
+      type: array
+      items:
+        type: object
+        required: [key, name, price]
+        properties:
+          key:
+            type: string
+          name:
+            $ref: '#/I18nName'
+          price:
+            $ref: '#/Money'
+    timeline:
+      type: array
+      description: Present on show — latest provisioning task steps.
+      items:
+        type: object
+        additionalProperties: true
+    created_at:
+      type: string
+      format: date-time
+
+SsoLink:
+  type: object
+  required: [url, target, expires_at]
+  properties:
+    url:
+      type: string
+      format: uri
+    target:
+      type: string
+      enum: [panel]
+    expires_at:
+      type: string
+      format: date-time
+
+NodeRegisterWrite:
+  type: object
+  required: [name, role, hostname, wg_ip, plesk_api_key]
+  properties:
+    name:
+      type: string
+    role:
+      type: string
+      enum: [shared, wp]
+    hostname:
+      type: string
+    wg_ip:
+      type: string
+    public_ips:
+      type: array
+      items:
+        type: string
+    plesk_api_key:
+      type: string
+      writeOnly: true
+    capacity:
+      $ref: '#/ServerCapacity'

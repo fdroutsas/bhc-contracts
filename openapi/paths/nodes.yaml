@@ -1,0 +1,40 @@
+# M3 — golden-node self-registration (spec §16): the Ansible play's last step
+# posts the generated Plesk API key to the control plane over WireGuard.
+
+register:
+  post:
+    operationId: nodes.register
+    tags: [nodes]
+    summary: Node self-registration (bootstrap token, WG-only)
+    description: >
+      Authenticated by the per-provisioning bootstrap token — not a session.
+      The node lands in `maintenance` status until an admin activates it;
+      the posted Plesk API key is stored encrypted and never echoed back.
+    security: []
+    parameters:
+      - name: X-Node-Bootstrap-Token
+        in: header
+        required: true
+        schema:
+          type: string
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/NodeRegisterWrite'
+    responses:
+      '201':
+        description: Server row created in maintenance status.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminServer'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'

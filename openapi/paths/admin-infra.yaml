@@ -1,0 +1,518 @@
+# M3 — Plesk provisioning infrastructure (spec §6, §14). All ops are admin
+# guard + mandatory TOTP + servers.* permissions, audited. plesk_api_key is
+# write-only: it never appears in any response.
+
+servers:
+  get:
+    operationId: admin.infra.servers.index
+    tags: [admin-infra]
+    summary: List servers (cursor-paginated)
+    parameters:
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          default: 25
+    responses:
+      '200':
+        description: One page of servers with health and capacity.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/AdminServer'
+                links:
+                  type: object
+                  additionalProperties: true
+                meta:
+                  type: object
+                  additionalProperties: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+  post:
+    operationId: admin.infra.servers.create
+    tags: [admin-infra]
+    summary: Register a server (audited)
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/AdminServerWrite'
+    responses:
+      '201':
+        description: Server created (status defaults to maintenance).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminServer'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+serversKey:
+  get:
+    operationId: admin.infra.servers.show
+    tags: [admin-infra]
+    summary: Server detail (health, capacity, utilization)
+    parameters:
+      - $ref: '#/components/serverId'
+    responses:
+      '200':
+        description: The server.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminServer'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+  put:
+    operationId: admin.infra.servers.update
+    tags: [admin-infra]
+    summary: Update a server (status transitions incl. drain — audited)
+    parameters:
+      - $ref: '#/components/serverId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/AdminServerWrite'
+    responses:
+      '200':
+        description: Updated server.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminServer'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+  delete:
+    operationId: admin.infra.servers.delete
+    tags: [admin-infra]
+    summary: Remove a server (only when offline and hosting nothing — audited)
+    parameters:
+      - $ref: '#/components/serverId'
+    responses:
+      '204':
+        description: Removed.
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: Server still active or hosting services (SERVER_NOT_REMOVABLE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+serverIps:
+  get:
+    operationId: admin.infra.servers.ips.index
+    tags: [admin-infra]
+    summary: IP inventory of a server
+    parameters:
+      - $ref: '#/components/serverId'
+    responses:
+      '200':
+        description: All IPs with their assignments.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/ServerIp'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+  post:
+    operationId: admin.infra.servers.ips.add
+    tags: [admin-infra]
+    summary: Add an IP to the inventory (audited)
+    parameters:
+      - $ref: '#/components/serverId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/ServerIpWrite'
+    responses:
+      '201':
+        description: IP added.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/ServerIp'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+serverIpsKey:
+  delete:
+    operationId: admin.infra.servers.ips.remove
+    tags: [admin-infra]
+    summary: Remove an unassigned IP (audited)
+    parameters:
+      - $ref: '#/components/serverId'
+      - name: ipId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '204':
+        description: Removed.
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: IP is assigned to a service (IP_ASSIGNED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+serverPlanMaps:
+  get:
+    operationId: admin.infra.servers.planMaps.index
+    tags: [admin-infra]
+    summary: Plan ↔ Plesk service-plan mappings of a node
+    parameters:
+      - $ref: '#/components/serverId'
+    responses:
+      '200':
+        description: Current mappings (provisioning hard-fails on missing ones).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/PlanMap'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+serverPlanMapsSync:
+  post:
+    operationId: admin.infra.servers.planMaps.sync
+    tags: [admin-infra]
+    summary: Pull service plans from the node and re-map (audited)
+    parameters:
+      - $ref: '#/components/serverId'
+    responses:
+      '200':
+        description: Sync result — mapped plans and plans missing on the node.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/PlanMapSyncResult'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '502':
+        description: Node unreachable (NODE_UNREACHABLE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+serverReconcile:
+  post:
+    operationId: admin.infra.servers.reconcile
+    tags: [admin-infra]
+    summary: Queue an on-demand reconciliation run for a node (§6.3)
+    parameters:
+      - $ref: '#/components/serverId'
+    responses:
+      '202':
+        description: Reconciliation queued; findings land in the queue.
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+provisionTasks:
+  get:
+    operationId: admin.infra.tasks.index
+    tags: [admin-infra]
+    summary: Provisioning monitor (cursor-paginated, filterable)
+    parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [pending, running, failed, completed]
+      - name: service_id
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          default: 25
+    responses:
+      '200':
+        description: One page of provision tasks.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/ProvisionTask'
+                links:
+                  type: object
+                  additionalProperties: true
+                meta:
+                  type: object
+                  additionalProperties: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+provisionTasksKey:
+  get:
+    operationId: admin.infra.tasks.show
+    tags: [admin-infra]
+    summary: Task detail with the full step timeline
+    parameters:
+      - $ref: '#/components/taskId'
+    responses:
+      '200':
+        description: The task.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/ProvisionTask'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+provisionTasksRetry:
+  post:
+    operationId: admin.infra.tasks.retry
+    tags: [admin-infra]
+    summary: Retry a failed task — resumes from the last completed step (audited)
+    parameters:
+      - $ref: '#/components/taskId'
+    responses:
+      '202':
+        description: Retry queued.
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: Task is not in a retryable state (TASK_NOT_RETRYABLE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+reconFindings:
+  get:
+    operationId: admin.infra.recon.index
+    tags: [admin-infra]
+    summary: Reconciliation findings queue (never auto-destructive, §6.3)
+    parameters:
+      - name: server_id
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: kind
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [orphan_on_node, missing_on_node, quota_drift, usage]
+      - name: unresolved
+        in: query
+        required: false
+        schema:
+          type: boolean
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          default: 25
+    responses:
+      '200':
+        description: One page of findings.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/ReconFinding'
+                links:
+                  type: object
+                  additionalProperties: true
+                meta:
+                  type: object
+                  additionalProperties: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+reconFindingsResolve:
+  post:
+    operationId: admin.infra.recon.resolve
+    tags: [admin-infra]
+    summary: Mark a finding as resolved (audited)
+    parameters:
+      - name: findingId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: Resolved finding.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/ReconFinding'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+components:
+  serverId:
+    name: serverId
+    in: path
+    required: true
+    schema:
+      type: string
+      format: uuid
+  taskId:
+    name: taskId
+    in: path
+    required: true
+    schema:
+      type: string
+      format: uuid
