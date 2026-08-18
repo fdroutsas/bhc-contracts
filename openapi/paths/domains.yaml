@@ -113,12 +113,8 @@ domainsPropagation:
         $ref: '../components/responses.yaml#/Forbidden'
       '404':
         $ref: '../components/responses.yaml#/NotFound'
-      '502':
-        description: Resolver unreachable (DNS_LOOKUP_FAILED).
-        content:
-          application/problem+json:
-            schema:
-              $ref: '../components/schemas.yaml#/Problem'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'
 
 domainsDns:
   get:

@@ -1001,10 +1001,14 @@ DnsRecordInput:
 
 PropagationStatus:
   type: object
-  required: [connected, expected_ns, current_ns, checked_at]
+  description: >
+    Live DoH probe verdict. `unknown` = the resolver could not answer —
+    the probe degrades, it never 5xxs (§3.1 sanctioned-exception terms).
+  required: [status, expected_ns, current_ns, checked_at]
   properties:
-    connected:
-      type: boolean
+    status:
+      type: string
+      enum: [connected, pending, unknown]
     expected_ns:
       type: array
       items:

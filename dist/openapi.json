@@ -2440,15 +2440,8 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           },
-          "502": {
-            "description": "Resolver unreachable (DNS_LOOKUP_FAILED).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           }
         }
       }
@@ -6028,15 +6021,21 @@
       },
       "PropagationStatus": {
         "type": "object",
+        "description": "Live DoH probe verdict. `unknown` = the resolver could not answer — the probe degrades, it never 5xxs (§3.1 sanctioned-exception terms).\n",
         "required": [
-          "connected",
+          "status",
           "expected_ns",
           "current_ns",
           "checked_at"
         ],
         "properties": {
-          "connected": {
-            "type": "boolean"
+          "status": {
+            "type": "string",
+            "enum": [
+              "connected",
+              "pending",
+              "unknown"
+            ]
           },
           "expected_ns": {
             "type": "array",
