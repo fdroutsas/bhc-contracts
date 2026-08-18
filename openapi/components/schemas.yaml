@@ -887,3 +887,132 @@ NodeRegisterWrite:
       writeOnly: true
     capacity:
       $ref: '#/ServerCapacity'
+
+Domain:
+  type: object
+  description: >
+    Customer view of a domain and its managed zone (§8). Zone status
+    attention_needed means managed records were skipped over conflicts with
+    pre-existing customer records — surfaced here, never silently
+    half-applied.
+  required: [id, account_id, fqdn, source, zone]
+  properties:
+    id:
+      type: string
+      format: uuid
+    account_id:
+      type: string
+      format: uuid
+    service_id:
+      type: [string, 'null']
+      format: uuid
+    fqdn:
+      type: string
+    source:
+      type: string
+      enum: [byo, registered]
+    ns_verified_at:
+      type: [string, 'null']
+      format: date-time
+    zone:
+      anyOf:
+        - $ref: '#/DnsZone'
+        - type: 'null'
+    created_at:
+      type: string
+      format: date-time
+
+DnsZone:
+  type: object
+  required: [status, ns, proxied_default, conflicts]
+  properties:
+    status:
+      type: string
+      description: attention_needed = zone up but managed records skipped over conflicts.
+      enum: [pending, active, error, attention_needed]
+    ns:
+      type: array
+      items:
+        type: string
+    proxied_default:
+      type: boolean
+    conflicts:
+      type: array
+      description: >
+        Managed records NOT applied because a pre-existing customer record
+        occupies the same name/type — never overwritten (§8 guardrail).
+      items:
+        type: object
+        required: [name, type, reason]
+        properties:
+          name:
+            type: string
+          type:
+            type: string
+          reason:
+            type: string
+
+DnsRecord:
+  type: object
+  required: [id, type, name, content, ttl, proxied, managed]
+  properties:
+    id:
+      type: string
+      description: Cloudflare record id.
+    type:
+      type: string
+      description: A, AAAA, CNAME, MX, TXT, NS, SRV, CAA…
+    name:
+      type: string
+    content:
+      type: string
+    ttl:
+      type: integer
+      description: Seconds; 1 = automatic.
+    priority:
+      type: [integer, 'null']
+      description: MX/SRV only.
+    proxied:
+      type: boolean
+    managed:
+      type: boolean
+      description: Carries the bhc managed tag — guarded in the editor.
+    comment:
+      type: [string, 'null']
+
+DnsRecordInput:
+  type: object
+  required: [type, name, content]
+  properties:
+    type:
+      type: string
+    name:
+      type: string
+    content:
+      type: string
+    ttl:
+      type: integer
+      default: 1
+    priority:
+      type: integer
+    proxied:
+      type: boolean
+      default: false
+
+PropagationStatus:
+  type: object
+  required: [connected, expected_ns, current_ns, checked_at]
+  properties:
+    connected:
+      type: boolean
+    expected_ns:
+      type: array
+      items:
+        type: string
+    current_ns:
+      type: array
+      items:
+        type: string
+    checked_at:
+      type: string
+      format: date-time
