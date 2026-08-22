@@ -847,7 +847,54 @@ Service:
       items:
         type: object
         additionalProperties: true
+    pending_plan_change:
+      description: >
+        Scheduled downgrade (M3.5) — applied at renewal, quota-guarded at
+        J-7 and at application, cancellable until the J-7 invoice issues.
+      anyOf:
+        - type: object
+          required: [plan_key, name, effective_at, cancellable]
+          properties:
+            plan_key:
+              type: string
+            name:
+              $ref: '#/I18nName'
+            effective_at:
+              type: string
+              format: date-time
+            cancellable:
+              type: boolean
+        - type: 'null'
     created_at:
+      type: string
+      format: date-time
+
+PlanChangePreview:
+  type: object
+  description: >
+    The proration engine's deterministic numbers (§7 v1.9 rounding —
+    retained floors, credit = snapshot − retained, sums close to the cent).
+  required: [direction, cycle_days, remaining_days, credit, charge, net_due_now, effective_at]
+  properties:
+    direction:
+      type: string
+      enum: [upgrade, downgrade, sidegrade]
+    cycle_days:
+      type: integer
+    remaining_days:
+      type: integer
+    credit:
+      $ref: '#/Money'
+    charge:
+      description: Full new-cycle price (immediate paths) or the new renewal price (downgrade).
+      $ref: '#/Money'
+    net_due_now:
+      description: >-
+        The card's exact share after the §7 balance-first split: gross minus
+        what the wallet (balance + fresh credit) absorbs. 0 for downgrades
+        and when the wallet covers everything.
+      $ref: '#/Money'
+    effective_at:
       type: string
       format: date-time
 
