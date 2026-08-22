@@ -1,0 +1,361 @@
+# M4 — customer domains & DNS surface (§8). Zone truth lives at Cloudflare;
+# the cache serves the UI. Managed (bhc) records carry managed=true and are
+# guarded: mutating one requires an explicit confirm. Conflicts with
+# pre-existing customer records are NEVER overwritten — they surface as
+# zone status attention_needed with the conflict list.
+
+domains:
+  get:
+    operationId: domains.index
+    tags: [domains]
+    summary: List the domains of an account (member-gated)
+    parameters:
+      - name: account_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          default: 25
+    responses:
+      '200':
+        description: One page of domains with their zone state.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/Domain'
+                links:
+                  type: object
+                  additionalProperties: true
+                meta:
+                  type: object
+                  additionalProperties: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+domainsKey:
+  get:
+    operationId: domains.show
+    tags: [domains]
+    summary: Domain detail — zone status, NS pair, conflicts (BYO wizard data)
+    parameters:
+      - name: domainId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: The domain with its zone (attention_needed ⇒ conflicts listed).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/Domain'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+domainsPropagation:
+  get:
+    operationId: domains.propagation
+    tags: [domains]
+    summary: Live NS propagation check (DoH lookup — the «Συνδέθηκε ✓» probe)
+    parameters:
+      - name: domainId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: Current NS as the world sees them vs the assigned pair.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/PropagationStatus'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+domainsDns:
+  get:
+    operationId: domains.dns.index
+    tags: [domains]
+    summary: Zone records (cache; refresh=true pulls Cloudflare first)
+    parameters:
+      - name: domainId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: refresh
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+    responses:
+      '200':
+        description: Records with the managed flag; synced_at dates the cache.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, synced_at]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/DnsRecord'
+                synced_at:
+                  type: string
+                  format: date-time
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: Zone not ready for record operations (ZONE_NOT_READY).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '502':
+        description: Cloudflare unreachable (DNS_PROVIDER_UNAVAILABLE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+domainsDnsRecords:
+  post:
+    operationId: domains.dns.records.store
+    tags: [domains]
+    summary: Create a record (roles owner/admin/tech; audited; diff-applied)
+    parameters:
+      - name: domainId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/DnsRecordInput'
+    responses:
+      '201':
+        description: >
+          The record as Cloudflare stored it; cache resynced. `warning`
+          appears when an informed proxied choice lands outside the cert
+          coverage on a strict zone (created anyway — never blocked).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/DnsRecord'
+                warning:
+                  type: string
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: Zone not ready (ZONE_NOT_READY).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '422':
+        description: >
+          Input validation (VALIDATION_FAILED) or the provider's own
+          validator mirrored verbatim (DNS_PROVIDER_REJECTED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '502':
+        description: Cloudflare unreachable (DNS_PROVIDER_UNAVAILABLE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+domainsDnsRecordsKey:
+  put:
+    operationId: domains.dns.records.update
+    tags: [domains]
+    summary: Update a record (managed records demand confirm=true)
+    parameters:
+      - name: domainId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: recordId
+        in: path
+        required: true
+        schema:
+          type: string
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '../components/schemas.yaml#/DnsRecordInput'
+              - type: object
+                properties:
+                  confirm:
+                    type: boolean
+                    description: Required true when touching a managed record.
+    responses:
+      '200':
+        description: The updated record; cache resynced. `warning` as on create.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/DnsRecord'
+                warning:
+                  type: string
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: >
+          Managed record without confirm (MANAGED_RECORD_CONFIRM_REQUIRED),
+          NS record (NS_RECORD_IMMUTABLE — zone authority is not a record)
+          or zone not ready (ZONE_NOT_READY).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '422':
+        description: >
+          Input validation (VALIDATION_FAILED) or the provider's own
+          validator mirrored verbatim (DNS_PROVIDER_REJECTED — the detail
+          carries the provider reason).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '502':
+        description: Cloudflare unreachable (DNS_PROVIDER_UNAVAILABLE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+  delete:
+    operationId: domains.dns.records.destroy
+    tags: [domains]
+    summary: Delete a record (managed records demand confirm=true)
+    parameters:
+      - name: domainId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: recordId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: confirm
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+    responses:
+      '200':
+        description: Deleted; cache resynced.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [deleted]
+                  properties:
+                    deleted:
+                      type: boolean
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: >
+          Managed record without confirm (MANAGED_RECORD_CONFIRM_REQUIRED)
+          or NS record (NS_RECORD_IMMUTABLE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '502':
+        description: Cloudflare unreachable (DNS_PROVIDER_UNAVAILABLE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'

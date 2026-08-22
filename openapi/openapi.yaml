@@ -31,6 +31,8 @@ tags:
     description: Catalog management (products, plans, addons, coupons — audited)
   - name: services
     description: Customer services — read + SSO only in v1 (M3)
+  - name: domains
+    description: Domains & DNS — zone status, propagation, guarded record editor (M4, §8)
   - name: admin-infra
     description: Servers, provisioning monitor, reconciliation (M3 — audited)
   - name: nodes
@@ -96,6 +98,18 @@ paths:
     $ref: './paths/services.yaml#/servicesKey'
   /services/{serviceId}/sso:
     $ref: './paths/services.yaml#/servicesSso'
+  /domains:
+    $ref: './paths/domains.yaml#/domains'
+  /domains/{domainId}:
+    $ref: './paths/domains.yaml#/domainsKey'
+  /domains/{domainId}/propagation:
+    $ref: './paths/domains.yaml#/domainsPropagation'
+  /domains/{domainId}/dns:
+    $ref: './paths/domains.yaml#/domainsDns'
+  /domains/{domainId}/dns/records:
+    $ref: './paths/domains.yaml#/domainsDnsRecords'
+  /domains/{domainId}/dns/records/{recordId}:
+    $ref: './paths/domains.yaml#/domainsDnsRecordsKey'
   /nodes/register:
     $ref: './paths/nodes.yaml#/register'
   /admin/servers:

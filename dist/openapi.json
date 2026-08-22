@@ -54,6 +54,10 @@
       "description": "Customer services — read + SSO only in v1 (M3)"
     },
     {
+      "name": "domains",
+      "description": "Domains & DNS — zone status, propagation, guarded record editor (M4, §8)"
+    },
+    {
       "name": "admin-infra",
       "description": "Servers, provisioning monitor, reconciliation (M3 — audited)"
     },
@@ -2258,6 +2262,569 @@
           },
           "422": {
             "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/domains": {
+      "get": {
+        "operationId": "domains.index",
+        "tags": [
+          "domains"
+        ],
+        "summary": "List the domains of an account (member-gated)",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of domains with their zone state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Domain"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/domains/{domainId}": {
+      "get": {
+        "operationId": "domains.show",
+        "tags": [
+          "domains"
+        ],
+        "summary": "Domain detail — zone status, NS pair, conflicts (BYO wizard data)",
+        "parameters": [
+          {
+            "name": "domainId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The domain with its zone (attention_needed ⇒ conflicts listed).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Domain"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/domains/{domainId}/propagation": {
+      "get": {
+        "operationId": "domains.propagation",
+        "tags": [
+          "domains"
+        ],
+        "summary": "Live NS propagation check (DoH lookup — the «Συνδέθηκε ✓» probe)",
+        "parameters": [
+          {
+            "name": "domainId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current NS as the world sees them vs the assigned pair.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/PropagationStatus"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/domains/{domainId}/dns": {
+      "get": {
+        "operationId": "domains.dns.index",
+        "tags": [
+          "domains"
+        ],
+        "summary": "Zone records (cache; refresh=true pulls Cloudflare first)",
+        "parameters": [
+          {
+            "name": "domainId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "refresh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Records with the managed flag; synced_at dates the cache.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "synced_at"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DnsRecord"
+                      }
+                    },
+                    "synced_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Zone not ready for record operations (ZONE_NOT_READY).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Cloudflare unreachable (DNS_PROVIDER_UNAVAILABLE).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/domains/{domainId}/dns/records": {
+      "post": {
+        "operationId": "domains.dns.records.store",
+        "tags": [
+          "domains"
+        ],
+        "summary": "Create a record (roles owner/admin/tech; audited; diff-applied)",
+        "parameters": [
+          {
+            "name": "domainId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DnsRecordInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The record as Cloudflare stored it; cache resynced. `warning` appears when an informed proxied choice lands outside the cert coverage on a strict zone (created anyway — never blocked).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/DnsRecord"
+                    },
+                    "warning": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Zone not ready (ZONE_NOT_READY).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Input validation (VALIDATION_FAILED) or the provider's own validator mirrored verbatim (DNS_PROVIDER_REJECTED).\n",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Cloudflare unreachable (DNS_PROVIDER_UNAVAILABLE).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/domains/{domainId}/dns/records/{recordId}": {
+      "put": {
+        "operationId": "domains.dns.records.update",
+        "tags": [
+          "domains"
+        ],
+        "summary": "Update a record (managed records demand confirm=true)",
+        "parameters": [
+          {
+            "name": "domainId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "recordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/DnsRecordInput"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "confirm": {
+                        "type": "boolean",
+                        "description": "Required true when touching a managed record."
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated record; cache resynced. `warning` as on create.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/DnsRecord"
+                    },
+                    "warning": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Managed record without confirm (MANAGED_RECORD_CONFIRM_REQUIRED), NS record (NS_RECORD_IMMUTABLE — zone authority is not a record) or zone not ready (ZONE_NOT_READY).\n",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Input validation (VALIDATION_FAILED) or the provider's own validator mirrored verbatim (DNS_PROVIDER_REJECTED — the detail carries the provider reason).\n",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Cloudflare unreachable (DNS_PROVIDER_UNAVAILABLE).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "domains.dns.records.destroy",
+        "tags": [
+          "domains"
+        ],
+        "summary": "Delete a record (managed records demand confirm=true)",
+        "parameters": [
+          {
+            "name": "domainId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "recordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "confirm",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted; cache resynced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "deleted"
+                      ],
+                      "properties": {
+                        "deleted": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Managed record without confirm (MANAGED_RECORD_CONFIRM_REQUIRED) or NS record (NS_RECORD_IMMUTABLE).\n",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Cloudflare unreachable (DNS_PROVIDER_UNAVAILABLE).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         }
       }
@@ -5357,6 +5924,236 @@
           "expires_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "DnsZone": {
+        "type": "object",
+        "required": [
+          "status",
+          "ns",
+          "proxied_default",
+          "conflicts"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "attention_needed = zone up but managed records skipped over conflicts.",
+            "enum": [
+              "pending",
+              "active",
+              "error",
+              "attention_needed"
+            ]
+          },
+          "ns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "proxied_default": {
+            "type": "boolean"
+          },
+          "conflicts": {
+            "type": "array",
+            "description": "Managed records NOT applied because a pre-existing customer record occupies the same name/type — never overwritten (§8 guardrail).\n",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "type",
+                "reason"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Domain": {
+        "type": "object",
+        "description": "Customer view of a domain and its managed zone (§8). Zone status attention_needed means managed records were skipped over conflicts with pre-existing customer records — surfaced here, never silently half-applied.\n",
+        "required": [
+          "id",
+          "account_id",
+          "fqdn",
+          "source",
+          "zone"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "account_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "service_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "fqdn": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "byo",
+              "registered"
+            ]
+          },
+          "ns_verified_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "zone": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DnsZone"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PropagationStatus": {
+        "type": "object",
+        "description": "Live DoH probe verdict. `unknown` = the resolver could not answer — the probe degrades, it never 5xxs (§3.1 sanctioned-exception terms).\n",
+        "required": [
+          "status",
+          "expected_ns",
+          "current_ns",
+          "checked_at"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "connected",
+              "pending",
+              "unknown"
+            ]
+          },
+          "expected_ns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "current_ns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DnsRecord": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "name",
+          "content",
+          "ttl",
+          "proxied",
+          "managed"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Cloudflare record id."
+          },
+          "type": {
+            "type": "string",
+            "description": "A, AAAA, CNAME, MX, TXT, NS, SRV, CAA…"
+          },
+          "name": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "ttl": {
+            "type": "integer",
+            "description": "Seconds; 1 = automatic."
+          },
+          "priority": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "MX/SRV only."
+          },
+          "proxied": {
+            "type": "boolean"
+          },
+          "managed": {
+            "type": "boolean",
+            "description": "Carries the bhc managed tag — guarded in the editor."
+          },
+          "comment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "DnsRecordInput": {
+        "type": "object",
+        "required": [
+          "type",
+          "name",
+          "content"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "ttl": {
+            "type": "integer",
+            "default": 1
+          },
+          "priority": {
+            "type": "integer"
+          },
+          "proxied": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
