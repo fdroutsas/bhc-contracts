@@ -208,7 +208,7 @@ servicesCancel:
       '404':
         $ref: '../components/responses.yaml#/NotFound'
       '409':
-        description: Not active (SERVICE_NOT_ACTIVE) or already scheduled (SERVICE_CANCEL_SCHEDULED).
+        description: Not active (SERVICE_NOT_ACTIVE), already scheduled (SERVICE_CANCEL_SCHEDULED), or the renewal invoice is already issued (SERVICE_CANCEL_LOCKED — support handles the cycle, no surgery on issued documents).
         content:
           application/problem+json:
             schema:
