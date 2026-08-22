@@ -2266,6 +2266,315 @@
         }
       }
     },
+    "/services/{serviceId}/change-plan": {
+      "post": {
+        "operationId": "services.changePlan",
+        "tags": [
+          "services"
+        ],
+        "summary": "Change the service plan — immediate upgrade or scheduled downgrade",
+        "parameters": [
+          {
+            "name": "serviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "plan_key"
+                ],
+                "properties": {
+                  "plan_key": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Upgrade: the service already on the new plan (snapshot rewritten, next_due rolled). Downgrade: the service carrying pending_plan_change.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Service"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "402": {
+            "description": "Payment failed or no usable method — ZERO state change (PAYMENT_FAILED).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Not active (SERVICE_NOT_ACTIVE — explicit for suspended/pending/ terminated alike), node cannot fit the new plan (NO_CAPACITY — clean block, zero state change) or plan incompatible (PLAN_NOT_COMPATIBLE).\n",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/services/{serviceId}/change-plan/preview": {
+      "get": {
+        "operationId": "services.changePlan.preview",
+        "tags": [
+          "services"
+        ],
+        "summary": "Deterministic proration preview (the engine's numbers, pre-commit)",
+        "parameters": [
+          {
+            "name": "serviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "plan_key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The exact amounts the change would produce today.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/PlanChangePreview"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Not active (SERVICE_NOT_ACTIVE) or plan incompatible (PLAN_NOT_COMPATIBLE).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/services/{serviceId}/change-plan/cancel": {
+      "post": {
+        "operationId": "services.changePlan.cancel",
+        "tags": [
+          "services"
+        ],
+        "summary": "Cancel a scheduled downgrade (until the J-7 invoice is issued)",
+        "parameters": [
+          {
+            "name": "serviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pending change cleared; the renewal bills the old plan.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Service"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Nothing pending (NO_PENDING_PLAN_CHANGE), locked past J-7 (PLAN_CHANGE_LOCKED) or not active (SERVICE_NOT_ACTIVE).\n",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/services/{serviceId}/addons": {
+      "post": {
+        "operationId": "services.addons.store",
+        "tags": [
+          "services"
+        ],
+        "summary": "Mid-cycle addon purchase — prorated remainder invoiced now",
+        "parameters": [
+          {
+            "name": "serviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "addon_key"
+                ],
+                "properties": {
+                  "addon_key": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Addon active on the service; the snapshot records the FULL cycle price (renewals bill that, v1.4).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Service"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "402": {
+            "description": "Payment failed — ZERO state change (PAYMENT_FAILED).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Not active (SERVICE_NOT_ACTIVE), already present (ADDON_ALREADY_PRESENT), incompatible (PLAN_NOT_COMPATIBLE) or no free dedicated IP (NO_CAPACITY).\n",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
     "/domains": {
       "get": {
         "operationId": "domains.index",
@@ -5897,6 +6206,38 @@
               "additionalProperties": true
             }
           },
+          "pending_plan_change": {
+            "description": "Scheduled downgrade (M3.5) — applied at renewal, quota-guarded at J-7 and at application, cancellable until the J-7 invoice issues.\n",
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "plan_key",
+                  "name",
+                  "effective_at",
+                  "cancellable"
+                ],
+                "properties": {
+                  "plan_key": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "$ref": "#/components/schemas/I18nName"
+                  },
+                  "effective_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "cancellable": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "created_at": {
             "type": "string",
             "format": "date-time"
@@ -5922,6 +6263,50 @@
             ]
           },
           "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PlanChangePreview": {
+        "type": "object",
+        "description": "The proration engine's deterministic numbers (§7 v1.9 rounding — retained floors, credit = snapshot − retained, sums close to the cent).\n",
+        "required": [
+          "direction",
+          "cycle_days",
+          "remaining_days",
+          "credit",
+          "charge",
+          "net_due_now",
+          "effective_at"
+        ],
+        "properties": {
+          "direction": {
+            "type": "string",
+            "enum": [
+              "upgrade",
+              "downgrade",
+              "sidegrade"
+            ]
+          },
+          "cycle_days": {
+            "type": "integer"
+          },
+          "remaining_days": {
+            "type": "integer"
+          },
+          "credit": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "charge": {
+            "description": "Full new-cycle price (immediate paths) or the new renewal price (downgrade).",
+            "$ref": "#/components/schemas/Money"
+          },
+          "net_due_now": {
+            "description": "What the customer pays NOW (0 for downgrades and when credit covers).",
+            "$ref": "#/components/schemas/Money"
+          },
+          "effective_at": {
             "type": "string",
             "format": "date-time"
           }

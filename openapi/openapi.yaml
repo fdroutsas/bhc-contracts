@@ -98,6 +98,14 @@ paths:
     $ref: './paths/services.yaml#/servicesKey'
   /services/{serviceId}/sso:
     $ref: './paths/services.yaml#/servicesSso'
+  /services/{serviceId}/change-plan:
+    $ref: './paths/plan-changes.yaml#/changePlan'
+  /services/{serviceId}/change-plan/preview:
+    $ref: './paths/plan-changes.yaml#/changePlanPreview'
+  /services/{serviceId}/change-plan/cancel:
+    $ref: './paths/plan-changes.yaml#/changePlanCancel'
+  /services/{serviceId}/addons:
+    $ref: './paths/plan-changes.yaml#/serviceAddons'
   /domains:
     $ref: './paths/domains.yaml#/domains'
   /domains/{domainId}:

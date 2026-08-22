@@ -1,0 +1,208 @@
+# M3.5 — plan changes & proration (§7/§19 v1.6, decisions+mods 2026-08-22).
+# Upgrades apply immediately and ONLY with a successful payment (zero state
+# change on failure); downgrades schedule pending_plan_change — cancellable
+# until the J-7 renewal invoice is issued, quota-guarded at J-7 AND at
+# application. Addons ride the same proration engine. Rounding: retained =
+# floor(snapshot × used/cycle_days); credit = snapshot − retained — the
+# invariant closes to the cent.
+
+changePlan:
+  post:
+    operationId: services.changePlan
+    tags: [services]
+    summary: Change the service plan — immediate upgrade or scheduled downgrade
+    parameters:
+      - name: serviceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [plan_key]
+            properties:
+              plan_key:
+                type: string
+    responses:
+      '200':
+        description: >
+          Upgrade: the service already on the new plan (snapshot rewritten,
+          next_due rolled). Downgrade: the service carrying
+          pending_plan_change.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/Service'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '402':
+        description: Payment failed or no usable method — ZERO state change (PAYMENT_FAILED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: >
+          Not active (SERVICE_NOT_ACTIVE — explicit for suspended/pending/
+          terminated alike), node cannot fit the new plan (NO_CAPACITY —
+          clean block, zero state change) or plan incompatible
+          (PLAN_NOT_COMPATIBLE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+changePlanPreview:
+  get:
+    operationId: services.changePlan.preview
+    tags: [services]
+    summary: Deterministic proration preview (the engine's numbers, pre-commit)
+    parameters:
+      - name: serviceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: plan_key
+        in: query
+        required: true
+        schema:
+          type: string
+    responses:
+      '200':
+        description: The exact amounts the change would produce today.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/PlanChangePreview'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: Not active (SERVICE_NOT_ACTIVE) or plan incompatible (PLAN_NOT_COMPATIBLE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+changePlanCancel:
+  post:
+    operationId: services.changePlan.cancel
+    tags: [services]
+    summary: Cancel a scheduled downgrade (until the J-7 invoice is issued)
+    parameters:
+      - name: serviceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: Pending change cleared; the renewal bills the old plan.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/Service'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: >
+          Nothing pending (NO_PENDING_PLAN_CHANGE), locked past J-7
+          (PLAN_CHANGE_LOCKED) or not active (SERVICE_NOT_ACTIVE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+serviceAddons:
+  post:
+    operationId: services.addons.store
+    tags: [services]
+    summary: Mid-cycle addon purchase — prorated remainder invoiced now
+    parameters:
+      - name: serviceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [addon_key]
+            properties:
+              addon_key:
+                type: string
+    responses:
+      '201':
+        description: >
+          Addon active on the service; the snapshot records the FULL cycle
+          price (renewals bill that, v1.4).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/Service'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '402':
+        description: Payment failed — ZERO state change (PAYMENT_FAILED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: >
+          Not active (SERVICE_NOT_ACTIVE), already present
+          (ADDON_ALREADY_PRESENT), incompatible (PLAN_NOT_COMPATIBLE) or no
+          free dedicated IP (NO_CAPACITY).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
