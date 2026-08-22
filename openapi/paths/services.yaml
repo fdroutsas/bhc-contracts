@@ -132,3 +132,123 @@ servicesSso:
               $ref: '../components/schemas.yaml#/Problem'
       '422':
         $ref: '../components/responses.yaml#/ValidationFailed'
+
+servicesUsage:
+  get:
+    operationId: services.usage
+    tags: [services]
+    summary: Usage snapshots for the detail-page bars (disk/traffic/mailboxes)
+    parameters:
+      - name: serviceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 90
+          default: 30
+    responses:
+      '200':
+        description: Chronological usage points (may be empty for fresh services).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/UsagePoint'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+servicesCancel:
+  post:
+    operationId: services.cancel
+    tags: [services]
+    summary: Schedule cancellation at period end (graceful, reversible)
+    description: >
+      Sets cancel_at_period_end — the J-7 renewal is NOT issued and the
+      service terminates gracefully at next_due. Mutually exclusive with a
+      pending plan change: scheduling a cancel CLEARS any pending change
+      (typed event); while a cancel is scheduled, change-plan and addon
+      purchases answer 409 SERVICE_CANCEL_SCHEDULED until uncancel.
+    parameters:
+      - name: serviceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: The service, cancellation scheduled.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/Service'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: Not active (SERVICE_NOT_ACTIVE), already scheduled (SERVICE_CANCEL_SCHEDULED), or the renewal invoice is already issued (SERVICE_CANCEL_LOCKED — support handles the cycle, no surgery on issued documents).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+servicesUncancel:
+  post:
+    operationId: services.uncancel
+    tags: [services]
+    summary: Withdraw a scheduled cancellation
+    description: >
+      Clears cancel_at_period_end while the service is still active; the
+      next dunning tick resumes normal renewal issuance.
+    parameters:
+      - name: serviceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: The service, back on the renewal track.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/Service'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: Not active (SERVICE_NOT_ACTIVE) or nothing scheduled (NO_CANCEL_SCHEDULED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'

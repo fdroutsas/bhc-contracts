@@ -102,7 +102,7 @@ changePlanPreview:
       '404':
         $ref: '../components/responses.yaml#/NotFound'
       '409':
-        description: Not active (SERVICE_NOT_ACTIVE) or plan incompatible (PLAN_NOT_COMPATIBLE).
+        description: Not active (SERVICE_NOT_ACTIVE), cancel scheduled (SERVICE_CANCEL_SCHEDULED) or plan incompatible (PLAN_NOT_COMPATIBLE).
         content:
           application/problem+json:
             schema:
@@ -197,7 +197,7 @@ serviceAddons:
         $ref: '../components/responses.yaml#/NotFound'
       '409':
         description: >
-          Not active (SERVICE_NOT_ACTIVE), already present
+          Not active (SERVICE_NOT_ACTIVE), cancel scheduled (SERVICE_CANCEL_SCHEDULED), already present
           (ADDON_ALREADY_PRESENT), incompatible (PLAN_NOT_COMPATIBLE) or no
           free dedicated IP (NO_CAPACITY).
         content:

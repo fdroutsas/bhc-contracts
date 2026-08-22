@@ -1,0 +1,255 @@
+# M5-B — the §13 Billing page read surface: documents, saved payment
+# methods, credit ledger. Money never moves through these endpoints.
+
+invoices:
+  get:
+    operationId: invoices.index
+    tags: [billing]
+    summary: List the account's billing documents (newest first)
+    parameters:
+      - name: account_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          default: 25
+    responses:
+      '200':
+        description: One page of documents.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/CustomerInvoice'
+                links:
+                  type: object
+                  additionalProperties: true
+                meta:
+                  type: object
+                  additionalProperties: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+invoicesKey:
+  get:
+    operationId: invoices.show
+    tags: [billing]
+    summary: One document with its lines
+    parameters:
+      - name: invoiceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: The document.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/CustomerInvoice'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+invoicesPdf:
+  get:
+    operationId: invoices.pdf
+    tags: [billing]
+    summary: Download the document PDF
+    parameters:
+      - name: invoiceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: The rendered PDF (immutable once issued).
+        content:
+          application/pdf:
+            schema:
+              type: string
+              format: binary
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+paymentMethods:
+  get:
+    operationId: paymentMethods.index
+    tags: [billing]
+    summary: List the account's saved payment methods
+    parameters:
+      - name: account_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: Saved methods (tokens never leave the server).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/PaymentMethod'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+paymentMethodsKey:
+  delete:
+    operationId: paymentMethods.destroy
+    tags: [billing]
+    summary: Remove a saved payment method
+    parameters:
+      - name: paymentMethodId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: Removed.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [deleted]
+                  properties:
+                    deleted:
+                      type: boolean
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+paymentMethodsDefault:
+  post:
+    operationId: paymentMethods.setDefault
+    tags: [billing]
+    summary: Make a saved method the default for off-session charges
+    parameters:
+      - name: paymentMethodId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: The method, now default.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/PaymentMethod'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+creditLedger:
+  get:
+    operationId: creditLedger.index
+    tags: [billing]
+    summary: The account's credit ledger (balance trail, newest first)
+    parameters:
+      - name: account_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          default: 25
+    responses:
+      '200':
+        description: One page of ledger entries.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/CreditEntry'
+                links:
+                  type: object
+                  additionalProperties: true
+                meta:
+                  type: object
+                  additionalProperties: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
