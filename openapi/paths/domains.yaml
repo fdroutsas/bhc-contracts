@@ -189,7 +189,10 @@ domainsDnsRecords:
             $ref: '../components/schemas.yaml#/DnsRecordInput'
     responses:
       '201':
-        description: The record as Cloudflare stored it; cache resynced.
+        description: >
+          The record as Cloudflare stored it; cache resynced. `warning`
+          appears when an informed proxied choice lands outside the cert
+          coverage on a strict zone (created anyway — never blocked).
         content:
           application/json:
             schema:
@@ -198,6 +201,8 @@ domainsDnsRecords:
               properties:
                 data:
                   $ref: '../components/schemas.yaml#/DnsRecord'
+                warning:
+                  type: string
       '401':
         $ref: '../components/responses.yaml#/Unauthenticated'
       '403':
@@ -211,7 +216,13 @@ domainsDnsRecords:
             schema:
               $ref: '../components/schemas.yaml#/Problem'
       '422':
-        $ref: '../components/responses.yaml#/ValidationFailed'
+        description: >
+          Input validation (VALIDATION_FAILED) or the provider's own
+          validator mirrored verbatim (DNS_PROVIDER_REJECTED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
       '502':
         description: Cloudflare unreachable (DNS_PROVIDER_UNAVAILABLE).
         content:
@@ -250,7 +261,7 @@ domainsDnsRecordsKey:
                     description: Required true when touching a managed record.
     responses:
       '200':
-        description: The updated record; cache resynced.
+        description: The updated record; cache resynced. `warning` as on create.
         content:
           application/json:
             schema:
@@ -259,6 +270,8 @@ domainsDnsRecordsKey:
               properties:
                 data:
                   $ref: '../components/schemas.yaml#/DnsRecord'
+                warning:
+                  type: string
       '401':
         $ref: '../components/responses.yaml#/Unauthenticated'
       '403':
@@ -266,13 +279,23 @@ domainsDnsRecordsKey:
       '404':
         $ref: '../components/responses.yaml#/NotFound'
       '409':
-        description: Managed record without confirm (MANAGED_RECORD_CONFIRM_REQUIRED) or zone not ready (ZONE_NOT_READY).
+        description: >
+          Managed record without confirm (MANAGED_RECORD_CONFIRM_REQUIRED),
+          NS record (NS_RECORD_IMMUTABLE — zone authority is not a record)
+          or zone not ready (ZONE_NOT_READY).
         content:
           application/problem+json:
             schema:
               $ref: '../components/schemas.yaml#/Problem'
       '422':
-        $ref: '../components/responses.yaml#/ValidationFailed'
+        description: >
+          Input validation (VALIDATION_FAILED) or the provider's own
+          validator mirrored verbatim (DNS_PROVIDER_REJECTED — the detail
+          carries the provider reason).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
       '502':
         description: Cloudflare unreachable (DNS_PROVIDER_UNAVAILABLE).
         content:
@@ -323,7 +346,9 @@ domainsDnsRecordsKey:
       '404':
         $ref: '../components/responses.yaml#/NotFound'
       '409':
-        description: Managed record without confirm (MANAGED_RECORD_CONFIRM_REQUIRED).
+        description: >
+          Managed record without confirm (MANAGED_RECORD_CONFIRM_REQUIRED)
+          or NS record (NS_RECORD_IMMUTABLE).
         content:
           application/problem+json:
             schema:

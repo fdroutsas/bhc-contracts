@@ -2562,7 +2562,7 @@
         },
         "responses": {
           "201": {
-            "description": "The record as Cloudflare stored it; cache resynced.",
+            "description": "The record as Cloudflare stored it; cache resynced. `warning` appears when an informed proxied choice lands outside the cert coverage on a strict zone (created anyway — never blocked).\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -2573,6 +2573,9 @@
                   "properties": {
                     "data": {
                       "$ref": "#/components/schemas/DnsRecord"
+                    },
+                    "warning": {
+                      "type": "string"
                     }
                   }
                 }
@@ -2599,7 +2602,14 @@
             }
           },
           "422": {
-            "$ref": "#/components/responses/ValidationFailed"
+            "description": "Input validation (VALIDATION_FAILED) or the provider's own validator mirrored verbatim (DNS_PROVIDER_REJECTED).\n",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "502": {
             "description": "Cloudflare unreachable (DNS_PROVIDER_UNAVAILABLE).",
@@ -2665,7 +2675,7 @@
         },
         "responses": {
           "200": {
-            "description": "The updated record; cache resynced.",
+            "description": "The updated record; cache resynced. `warning` as on create.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2676,6 +2686,9 @@
                   "properties": {
                     "data": {
                       "$ref": "#/components/schemas/DnsRecord"
+                    },
+                    "warning": {
+                      "type": "string"
                     }
                   }
                 }
@@ -2692,7 +2705,7 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "description": "Managed record without confirm (MANAGED_RECORD_CONFIRM_REQUIRED) or zone not ready (ZONE_NOT_READY).",
+            "description": "Managed record without confirm (MANAGED_RECORD_CONFIRM_REQUIRED), NS record (NS_RECORD_IMMUTABLE — zone authority is not a record) or zone not ready (ZONE_NOT_READY).\n",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2702,7 +2715,14 @@
             }
           },
           "422": {
-            "$ref": "#/components/responses/ValidationFailed"
+            "description": "Input validation (VALIDATION_FAILED) or the provider's own validator mirrored verbatim (DNS_PROVIDER_REJECTED — the detail carries the provider reason).\n",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "502": {
             "description": "Cloudflare unreachable (DNS_PROVIDER_UNAVAILABLE).",
@@ -2787,7 +2807,7 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "description": "Managed record without confirm (MANAGED_RECORD_CONFIRM_REQUIRED).",
+            "description": "Managed record without confirm (MANAGED_RECORD_CONFIRM_REQUIRED) or NS record (NS_RECORD_IMMUTABLE).\n",
             "content": {
               "application/problem+json": {
                 "schema": {
