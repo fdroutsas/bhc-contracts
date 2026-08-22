@@ -889,7 +889,10 @@ PlanChangePreview:
       description: Full new-cycle price (immediate paths) or the new renewal price (downgrade).
       $ref: '#/Money'
     net_due_now:
-      description: What the customer pays NOW (0 for downgrades and when credit covers).
+      description: >-
+        The card's exact share after the §7 balance-first split: gross minus
+        what the wallet (balance + fresh credit) absorbs. 0 for downgrades
+        and when the wallet covers everything.
       $ref: '#/Money'
     effective_at:
       type: string
