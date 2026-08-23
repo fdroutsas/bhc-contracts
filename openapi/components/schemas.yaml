@@ -1368,3 +1368,36 @@ ResponseTimePoint:
       type: number
     p95_ms:
       type: number
+
+VpsMetricPoint:
+  type: object
+  description: Hetzner metrics proxy sample (M7) — cached server-side.
+  required: [timestamp]
+  properties:
+    timestamp:
+      type: string
+      format: date-time
+    cpu_pct:
+      type: [number, 'null']
+    network_in_bytes:
+      type: [number, 'null']
+    network_out_bytes:
+      type: [number, 'null']
+
+WordpressCard:
+  type: object
+  description: >
+    §11 portal WP card, honest-null (M7/LD-8): every field the live WP
+    Toolkit surface has not verified yet is null — never fabricated.
+  required: [installed, sso_available]
+  properties:
+    installed:
+      type: boolean
+    version:
+      type: [string, 'null']
+    updates:
+      type: ['object', 'null']
+      description: Updates summary when the toolkit info verb is verified (LD-8); null until then.
+      additionalProperties: true
+    sso_available:
+      type: boolean

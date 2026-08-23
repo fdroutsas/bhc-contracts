@@ -85,10 +85,12 @@ servicesSso:
   post:
     operationId: services.sso
     tags: [services]
-    summary: Issue a one-time control-panel SSO link (short TTL, audited)
+    summary: Issue a one-time SSO link (short TTL, audited) — target per product capability
     description: >
-      Target `panel` only in v1 (spec §5 ssoUrl); `wp_admin` and `console`
-      arrive with M7. Each issuance is audit-logged against the actor.
+      §5 ssoUrl targets per product capability (M7): `panel` for
+      plesk-provisioned services, `wp_admin` for wp/woo (WP Toolkit
+      one-time login), `console` for VPS. An unsupported target answers
+      409 ACTION_NOT_SUPPORTED. Each issuance is audit-logged.
     parameters:
       - name: serviceId
         in: path
@@ -106,7 +108,7 @@ servicesSso:
             properties:
               target:
                 type: string
-                enum: [panel]
+                enum: [panel, wp_admin, console]
     responses:
       '200':
         description: Short-lived signed URL.
@@ -316,3 +318,198 @@ servicesResponseTimes:
         $ref: '../components/responses.yaml#/Forbidden'
       '404':
         $ref: '../components/responses.yaml#/NotFound'
+
+servicesPower:
+  post:
+    operationId: services.power
+    tags: [services]
+    summary: VPS power action (on / off / reboot) — capability-gated
+    description: >
+      VPS only (409 ACTION_NOT_SUPPORTED otherwise); active services only —
+      suspension is power-off WITH an action lock (§12). Rider B (M7):
+      `off` pauses the service monitor (typed monitor.paused, reason
+      customer_power_off) so self-inflicted downtime never alarms; `on`
+      resumes monitoring with reset anti-flap counters; `reboot` touches
+      nothing — the anti-flap window absorbs it.
+    parameters:
+      - name: serviceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [action]
+            properties:
+              action:
+                type: string
+                enum: [on, off, reboot]
+    responses:
+      '200':
+        description: Action dispatched to the node.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [action, dispatched]
+                  properties:
+                    action:
+                      type: string
+                    dispatched:
+                      type: boolean
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: Not active/locked (SERVICE_NOT_ACTIVE) or not a VPS (ACTION_NOT_SUPPORTED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+servicesRebuild:
+  post:
+    operationId: services.rebuild
+    tags: [services]
+    summary: Rebuild the VPS from its base image — destructive, capability-gated
+    description: >
+      VPS only. Destroys the disk contents and re-runs cloud-init;
+      requires explicit confirm. External refs stay (same server id).
+    parameters:
+      - name: serviceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [confirm]
+            properties:
+              confirm:
+                type: boolean
+    responses:
+      '200':
+        description: Rebuild dispatched.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [dispatched]
+                  properties:
+                    dispatched:
+                      type: boolean
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: Not active (SERVICE_NOT_ACTIVE), not a VPS (ACTION_NOT_SUPPORTED) or missing confirm (CONFIRM_REQUIRED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+servicesMetrics:
+  get:
+    operationId: services.metrics
+    tags: [services]
+    summary: VPS CPU/network metrics proxy (cached) — capability-gated
+    parameters:
+      - name: serviceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: Recent metric points (may be empty; served from cache).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/VpsMetricPoint'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: Not a VPS (ACTION_NOT_SUPPORTED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+servicesWordpress:
+  get:
+    operationId: services.wordpress
+    tags: [services]
+    summary: WP card data (honest-null — unverified fields are null)
+    description: >
+      wp/woo only (409 ACTION_NOT_SUPPORTED otherwise). Fields the real
+      WP Toolkit surface has not yet been verified to provide are null by
+      design (LD-8) — the SPA renders nulls gracefully from day one.
+    parameters:
+      - name: serviceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: The WP install picture, honest-null.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/WordpressCard'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: Not a WP/Woo service (ACTION_NOT_SUPPORTED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'

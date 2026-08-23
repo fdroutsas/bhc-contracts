@@ -1608,6 +1608,27 @@
                             "null"
                           ]
                         },
+                        "hostname": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "VPS only (M7) — the cloud server hostname."
+                        },
+                        "ssh_key": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "VPS only (M7): REQUIRED for vps plans (owner decision 2 — no generated root passwords in v1). OpenSSH public key format."
+                        },
+                        "location": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "VPS only — fsn1|nbg1|hel1 (§12)."
+                        },
                         "addon_ids": {
                           "type": "array",
                           "items": {
@@ -2200,8 +2221,8 @@
         "tags": [
           "services"
         ],
-        "summary": "Issue a one-time control-panel SSO link (short TTL, audited)",
-        "description": "Target `panel` only in v1 (spec §5 ssoUrl); `wp_admin` and `console` arrive with M7. Each issuance is audit-logged against the actor.\n",
+        "summary": "Issue a one-time SSO link (short TTL, audited) — target per product capability",
+        "description": "§5 ssoUrl targets per product capability (M7): `panel` for plesk-provisioned services, `wp_admin` for wp/woo (WP Toolkit one-time login), `console` for VPS. An unsupported target answers 409 ACTION_NOT_SUPPORTED. Each issuance is audit-logged.\n",
         "parameters": [
           {
             "name": "serviceId",
@@ -2226,7 +2247,9 @@
                   "target": {
                     "type": "string",
                     "enum": [
-                      "panel"
+                      "panel",
+                      "wp_admin",
+                      "console"
                     ]
                   }
                 }
@@ -2869,6 +2892,315 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/services/{serviceId}/power": {
+      "post": {
+        "operationId": "services.power",
+        "tags": [
+          "services"
+        ],
+        "summary": "VPS power action (on / off / reboot) — capability-gated",
+        "description": "VPS only (409 ACTION_NOT_SUPPORTED otherwise); active services only — suspension is power-off WITH an action lock (§12). Rider B (M7): `off` pauses the service monitor (typed monitor.paused, reason customer_power_off) so self-inflicted downtime never alarms; `on` resumes monitoring with reset anti-flap counters; `reboot` touches nothing — the anti-flap window absorbs it.\n",
+        "parameters": [
+          {
+            "name": "serviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "action"
+                ],
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "on",
+                      "off",
+                      "reboot"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Action dispatched to the node.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "action",
+                        "dispatched"
+                      ],
+                      "properties": {
+                        "action": {
+                          "type": "string"
+                        },
+                        "dispatched": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Not active/locked (SERVICE_NOT_ACTIVE) or not a VPS (ACTION_NOT_SUPPORTED).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/services/{serviceId}/rebuild": {
+      "post": {
+        "operationId": "services.rebuild",
+        "tags": [
+          "services"
+        ],
+        "summary": "Rebuild the VPS from its base image — destructive, capability-gated",
+        "description": "VPS only. Destroys the disk contents and re-runs cloud-init; requires explicit confirm. External refs stay (same server id).\n",
+        "parameters": [
+          {
+            "name": "serviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "confirm"
+                ],
+                "properties": {
+                  "confirm": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rebuild dispatched.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "dispatched"
+                      ],
+                      "properties": {
+                        "dispatched": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Not active (SERVICE_NOT_ACTIVE), not a VPS (ACTION_NOT_SUPPORTED) or missing confirm (CONFIRM_REQUIRED).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/services/{serviceId}/metrics": {
+      "get": {
+        "operationId": "services.metrics",
+        "tags": [
+          "services"
+        ],
+        "summary": "VPS CPU/network metrics proxy (cached) — capability-gated",
+        "parameters": [
+          {
+            "name": "serviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent metric points (may be empty; served from cache).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/VpsMetricPoint"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Not a VPS (ACTION_NOT_SUPPORTED).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/services/{serviceId}/wordpress": {
+      "get": {
+        "operationId": "services.wordpress",
+        "tags": [
+          "services"
+        ],
+        "summary": "WP card data (honest-null — unverified fields are null)",
+        "description": "wp/woo only (409 ACTION_NOT_SUPPORTED otherwise). Fields the real WP Toolkit surface has not yet been verified to provide are null by design (LD-8) — the SPA renders nulls gracefully from day one.\n",
+        "parameters": [
+          {
+            "name": "serviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The WP install picture, honest-null.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/WordpressCard"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Not a WP/Woo service (ACTION_NOT_SUPPORTED).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         }
       }
@@ -7779,6 +8111,67 @@
           },
           "p95_ms": {
             "type": "number"
+          }
+        }
+      },
+      "VpsMetricPoint": {
+        "type": "object",
+        "description": "Hetzner metrics proxy sample (M7) — cached server-side.",
+        "required": [
+          "timestamp"
+        ],
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cpu_pct": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "network_in_bytes": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "network_out_bytes": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        }
+      },
+      "WordpressCard": {
+        "type": "object",
+        "description": "§11 portal WP card, honest-null (M7/LD-8): every field the live WP Toolkit surface has not verified yet is null — never fabricated.\n",
+        "required": [
+          "installed",
+          "sso_available"
+        ],
+        "properties": {
+          "installed": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updates": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Updates summary when the toolkit info verb is verified (LD-8); null until then.",
+            "additionalProperties": true
+          },
+          "sso_available": {
+            "type": "boolean"
           }
         }
       },

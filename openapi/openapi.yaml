@@ -122,6 +122,14 @@ paths:
     $ref: './paths/services.yaml#/servicesUptime'
   /services/{serviceId}/response-times:
     $ref: './paths/services.yaml#/servicesResponseTimes'
+  /services/{serviceId}/power:
+    $ref: './paths/services.yaml#/servicesPower'
+  /services/{serviceId}/rebuild:
+    $ref: './paths/services.yaml#/servicesRebuild'
+  /services/{serviceId}/metrics:
+    $ref: './paths/services.yaml#/servicesMetrics'
+  /services/{serviceId}/wordpress:
+    $ref: './paths/services.yaml#/servicesWordpress'
   /status:
     $ref: './paths/status.yaml#/status'
   /status/history:
