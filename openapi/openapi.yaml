@@ -35,6 +35,8 @@ tags:
     description: Notification center + preferences (M5-B, consumer of typed events)
   - name: billing
     description: Billing read surface — documents, methods, credit ledger (M5-B)
+  - name: status
+    description: Public status surface (M6) — unauthenticated, aggressively cached
   - name: domains
     description: Domains & DNS — zone status, propagation, guarded record editor (M4, §8)
   - name: admin-infra
@@ -116,6 +118,20 @@ paths:
     $ref: './paths/services.yaml#/servicesCancel'
   /services/{serviceId}/uncancel:
     $ref: './paths/services.yaml#/servicesUncancel'
+  /services/{serviceId}/uptime:
+    $ref: './paths/services.yaml#/servicesUptime'
+  /services/{serviceId}/response-times:
+    $ref: './paths/services.yaml#/servicesResponseTimes'
+  /status:
+    $ref: './paths/status.yaml#/status'
+  /status/history:
+    $ref: './paths/status.yaml#/statusHistory'
+  /status/subscribe:
+    $ref: './paths/status.yaml#/statusSubscribe'
+  /status/confirm:
+    $ref: './paths/status.yaml#/statusConfirm'
+  /status/unsubscribe:
+    $ref: './paths/status.yaml#/statusUnsubscribe'
   /notifications:
     $ref: './paths/notifications.yaml#/notifications'
   /notifications/read-all:
