@@ -62,6 +62,10 @@
       "description": "Billing read surface — documents, methods, credit ledger (M5-B)"
     },
     {
+      "name": "status",
+      "description": "Public status surface (M6) — unauthenticated, aggressively cached"
+    },
+    {
       "name": "domains",
       "description": "Domains & DNS — zone status, propagation, guarded record editor (M4, §8)"
     },
@@ -2761,6 +2765,352 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/services/{serviceId}/uptime": {
+      "get": {
+        "operationId": "services.uptime",
+        "tags": [
+          "services"
+        ],
+        "summary": "90-day daily uptime bar data for the service monitor",
+        "parameters": [
+          {
+            "name": "serviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daily rollup points, oldest first (may be empty pre-monitoring).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/UptimePoint"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/services/{serviceId}/response-times": {
+      "get": {
+        "operationId": "services.responseTimes",
+        "tags": [
+          "services"
+        ],
+        "summary": "24-hour hourly response-time chart data (avg + p95)",
+        "parameters": [
+          {
+            "name": "serviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hourly rollup points, oldest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ResponseTimePoint"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/status": {
+      "get": {
+        "operationId": "status.show",
+        "tags": [
+          "status"
+        ],
+        "summary": "Public platform status — components, open public incidents, maintenance",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The current picture. Served from cache (30-60s) with stale-while-revalidate/stale-if-error so the page outlives an origin outage.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/StatusOverview"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/status/history": {
+      "get": {
+        "operationId": "status.history",
+        "tags": [
+          "status"
+        ],
+        "summary": "90-day daily uptime per public component",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Daily uptime points per component label.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/StatusComponentHistory"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/status/subscribe": {
+      "post": {
+        "operationId": "status.subscribe",
+        "tags": [
+          "status"
+        ],
+        "summary": "Subscribe an email to status updates (double opt-in)",
+        "description": "M5-B consent semantics, not a second model: explicit double opt-in (confirmation email with a signed link), one-click signed unsubscribe in every email, same mail infrastructure. Always answers 200 — no email enumeration. Strictly rate limited.\n",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "locale": {
+                    "type": "string",
+                    "enum": [
+                      "el",
+                      "en"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Always — check the inbox.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/status/confirm": {
+      "get": {
+        "operationId": "status.confirm",
+        "tags": [
+          "status"
+        ],
+        "summary": "Confirm a status subscription (signed link from the email)",
+        "security": [],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Confirmed — the subscription is active.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "confirmed"
+                      ],
+                      "properties": {
+                        "confirmed": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/status/unsubscribe": {
+      "get": {
+        "operationId": "status.unsubscribe",
+        "tags": [
+          "status"
+        ],
+        "summary": "One-click unsubscribe (signed link present in every email)",
+        "security": [],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unsubscribed — no further email.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "unsubscribed"
+                      ],
+                      "properties": {
+                        "unsubscribed": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           }
         }
       }
@@ -7381,6 +7731,211 @@
               "integer",
               "null"
             ]
+          }
+        }
+      },
+      "UptimePoint": {
+        "type": "object",
+        "required": [
+          "date",
+          "uptime_pct"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "uptime_pct": {
+            "type": "number"
+          },
+          "checks": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "fails": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        }
+      },
+      "ResponseTimePoint": {
+        "type": "object",
+        "required": [
+          "bucket",
+          "avg_ms",
+          "p95_ms"
+        ],
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "avg_ms": {
+            "type": "number"
+          },
+          "p95_ms": {
+            "type": "number"
+          }
+        }
+      },
+      "StatusComponent": {
+        "type": "object",
+        "required": [
+          "label",
+          "status"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "Public label only (platform component or anonymous node aggregate)."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "operational",
+              "degraded",
+              "down"
+            ]
+          },
+          "uptime_90d": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Percentage over the last 90 days, when history exists."
+          }
+        }
+      },
+      "PublicIncident": {
+        "type": "object",
+        "description": "Public view — component + timeframe + state; internal cause never leaks.",
+        "required": [
+          "id",
+          "component",
+          "status",
+          "opened_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "component": {
+            "type": "string",
+            "description": "The public label the incident is pinned to."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "resolved"
+            ]
+          },
+          "opened_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resolved_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "PublicMaintenance": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "body",
+          "starts_at",
+          "ends_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "description": "Localized for the request locale."
+          },
+          "body": {
+            "type": "string"
+          },
+          "component": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StatusOverview": {
+        "type": "object",
+        "description": "The public status picture (M6). Node components are OPT-IN anonymous aggregates (servers.status_label per §10 — \"Shared EU-1\"); nothing here ever carries hostnames, IPs, customer domains or fleet sizes.\n",
+        "required": [
+          "components",
+          "incidents",
+          "maintenance",
+          "generated_at"
+        ],
+        "properties": {
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatusComponent"
+            }
+          },
+          "incidents": {
+            "type": "array",
+            "description": "Open incidents explicitly flagged public — never automatic.",
+            "items": {
+              "$ref": "#/components/schemas/PublicIncident"
+            }
+          },
+          "maintenance": {
+            "type": "array",
+            "description": "Published maintenance windows (upcoming + active).",
+            "items": {
+              "$ref": "#/components/schemas/PublicMaintenance"
+            }
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StatusComponentHistory": {
+        "type": "object",
+        "required": [
+          "label",
+          "days"
+        ],
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UptimePoint"
+            }
           }
         }
       },

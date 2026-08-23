@@ -1249,3 +1249,122 @@ UsagePoint:
       type: [integer, 'null']
     mailboxes:
       type: [integer, 'null']
+
+StatusOverview:
+  type: object
+  description: >
+    The public status picture (M6). Node components are OPT-IN anonymous
+    aggregates (servers.status_label per §10 — "Shared EU-1"); nothing
+    here ever carries hostnames, IPs, customer domains or fleet sizes.
+  required: [components, incidents, maintenance, generated_at]
+  properties:
+    components:
+      type: array
+      items:
+        $ref: '#/StatusComponent'
+    incidents:
+      type: array
+      description: Open incidents explicitly flagged public — never automatic.
+      items:
+        $ref: '#/PublicIncident'
+    maintenance:
+      type: array
+      description: Published maintenance windows (upcoming + active).
+      items:
+        $ref: '#/PublicMaintenance'
+    generated_at:
+      type: string
+      format: date-time
+
+StatusComponent:
+  type: object
+  required: [label, status]
+  properties:
+    label:
+      type: string
+      description: Public label only (platform component or anonymous node aggregate).
+    status:
+      type: string
+      enum: [operational, degraded, down]
+    uptime_90d:
+      type: [number, 'null']
+      description: Percentage over the last 90 days, when history exists.
+
+StatusComponentHistory:
+  type: object
+  required: [label, days]
+  properties:
+    label:
+      type: string
+    days:
+      type: array
+      items:
+        $ref: '#/UptimePoint'
+
+PublicIncident:
+  type: object
+  description: Public view — component + timeframe + state; internal cause never leaks.
+  required: [id, component, status, opened_at]
+  properties:
+    id:
+      type: string
+      format: uuid
+    component:
+      type: string
+      description: The public label the incident is pinned to.
+    status:
+      type: string
+      enum: [open, resolved]
+    opened_at:
+      type: string
+      format: date-time
+    resolved_at:
+      type: [string, 'null']
+      format: date-time
+
+PublicMaintenance:
+  type: object
+  required: [id, title, body, starts_at, ends_at]
+  properties:
+    id:
+      type: string
+      format: uuid
+    title:
+      type: string
+      description: Localized for the request locale.
+    body:
+      type: string
+    component:
+      type: [string, 'null']
+    starts_at:
+      type: string
+      format: date-time
+    ends_at:
+      type: string
+      format: date-time
+
+UptimePoint:
+  type: object
+  required: [date, uptime_pct]
+  properties:
+    date:
+      type: string
+      format: date
+    uptime_pct:
+      type: number
+    checks:
+      type: [integer, 'null']
+    fails:
+      type: [integer, 'null']
+
+ResponseTimePoint:
+  type: object
+  required: [bucket, avg_ms, p95_ms]
+  properties:
+    bucket:
+      type: string
+      format: date-time
+    avg_ms:
+      type: number
+    p95_ms:
+      type: number

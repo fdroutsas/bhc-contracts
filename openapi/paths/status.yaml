@@ -1,0 +1,158 @@
+# M6 — the FIRST unauthenticated surface (owner posture, 2026-08-22).
+# Exposure doctrine: platform components, opt-in anonymous node aggregates
+# (§10 labels, never hostnames/IPs), incidents ONLY where public=true,
+# published maintenance. NEVER: hostnames, IPs, customer domains/services,
+# DNSBL, error strings, fleet sizes. Aggressively cached (Cache-Control
+# public + stale-while-revalidate + stale-if-error — the CDN serves the
+# last known picture even when the origin is down); a cache-warm hit
+# touches no database.
+
+status:
+  get:
+    operationId: status.show
+    tags: [status]
+    summary: Public platform status — components, open public incidents, maintenance
+    security: []
+    responses:
+      '200':
+        description: >
+          The current picture. Served from cache (30-60s) with
+          stale-while-revalidate/stale-if-error so the page outlives an
+          origin outage.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/StatusOverview'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+statusHistory:
+  get:
+    operationId: status.history
+    tags: [status]
+    summary: 90-day daily uptime per public component
+    security: []
+    responses:
+      '200':
+        description: Daily uptime points per component label.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/StatusComponentHistory'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+statusSubscribe:
+  post:
+    operationId: status.subscribe
+    tags: [status]
+    summary: Subscribe an email to status updates (double opt-in)
+    description: >
+      M5-B consent semantics, not a second model: explicit double opt-in
+      (confirmation email with a signed link), one-click signed unsubscribe
+      in every email, same mail infrastructure. Always answers 200 — no
+      email enumeration. Strictly rate limited.
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email]
+            properties:
+              email:
+                type: string
+                format: email
+              locale:
+                type: string
+                enum: [el, en]
+    responses:
+      '200':
+        description: Always — check the inbox.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [message]
+                  properties:
+                    message:
+                      type: string
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+statusConfirm:
+  get:
+    operationId: status.confirm
+    tags: [status]
+    summary: Confirm a status subscription (signed link from the email)
+    security: []
+    parameters:
+      - name: token
+        in: query
+        required: true
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Confirmed — the subscription is active.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [confirmed]
+                  properties:
+                    confirmed:
+                      type: boolean
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+statusUnsubscribe:
+  get:
+    operationId: status.unsubscribe
+    tags: [status]
+    summary: One-click unsubscribe (signed link present in every email)
+    security: []
+    parameters:
+      - name: token
+        in: query
+        required: true
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Unsubscribed — no further email.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [unsubscribed]
+                  properties:
+                    unsubscribed:
+                      type: boolean
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
