@@ -4,6 +4,11 @@ extends:
 apis:
   bhc@v1:
     root: openapi/openapi.yaml
+    # TS client output (openapi-typescript reads this config) — generated
+    # from the SAME source the bundle resolves; the freshness gate locks
+    # both artifacts to one commit.
+    x-openapi-ts:
+      output: dist/client/schema.d.ts
 
 rules:
   operation-operationId: error
