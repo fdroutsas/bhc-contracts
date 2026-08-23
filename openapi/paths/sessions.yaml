@@ -1,0 +1,106 @@
+# M5-B — revocable sessions/devices (§15.1). Revocation destroys the WHOLE
+# server-side session for that id: the other browser's next request is a
+# guest. One browser session may cohabit both guards until the ADR-0004
+# host split (M8) — revoking it logs that browser out of both.
+
+sessions:
+  get:
+    operationId: auth.sessions.index
+    tags: [auth]
+    summary: List the caller's active sessions/devices (current one flagged)
+    responses:
+      '200':
+        description: Active sessions, newest first.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/SessionDevice'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+
+sessionsKey:
+  delete:
+    operationId: auth.sessions.revoke
+    tags: [auth]
+    summary: Revoke a session — kills it server-side, immediately
+    parameters:
+      - name: sessionDeviceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: >
+          Revoked. Revoking the CURRENT session logs the caller out with
+          this response.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [revoked, current]
+                  properties:
+                    revoked:
+                      type: boolean
+                    current:
+                      type: boolean
+                      description: True when the caller revoked their own session.
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+password:
+  put:
+    operationId: auth.passwordChange
+    tags: [auth]
+    summary: Change the caller's password (current password required)
+    description: >
+      Other sessions of the user are evicted by the session password-hash
+      guard on their next request; the current session continues.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [current_password, password, password_confirmation]
+            properties:
+              current_password:
+                type: string
+              password:
+                type: string
+              password_confirmation:
+                type: string
+    responses:
+      '200':
+        description: Password changed.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [changed]
+                  properties:
+                    changed:
+                      type: boolean
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'

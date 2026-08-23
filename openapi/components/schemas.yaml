@@ -847,6 +847,12 @@ Service:
       items:
         type: object
         additionalProperties: true
+    cancel_at_period_end:
+      type: boolean
+      description: >
+        M5-B graceful cancellation flag — mutually exclusive with
+        pending_plan_change (scheduling a cancel clears it; money
+        mutations answer 409 SERVICE_CANCEL_SCHEDULED while set).
     pending_plan_change:
       description: >
         Scheduled downgrade (M3.5) — applied at renewal, quota-guarded at
@@ -1067,3 +1073,179 @@ PropagationStatus:
     checked_at:
       type: string
       format: date-time
+
+Notification:
+  type: object
+  description: >
+    In-app notification row (M5-B) — a routed consumer product of the typed
+    outbox events (golden rule 12). title/body are resolved for the
+    caller's locale; type + payload stay raw for client-side rendering.
+  required: [id, category, type, title, body, read_at, created_at]
+  properties:
+    id:
+      type: string
+      format: uuid
+    category:
+      type: string
+      enum: [billing, technical, marketing]
+    type:
+      type: string
+      description: The originating outbox event name (e.g. invoice.paid).
+    title:
+      type: string
+    body:
+      type: string
+    payload:
+      type: object
+      additionalProperties: true
+    read_at:
+      type: [string, 'null']
+      format: date-time
+    created_at:
+      type: string
+      format: date-time
+
+NotificationPreferences:
+  type: object
+  description: >
+    v1: only the EMAIL channel is toggleable per category — in-app is
+    always on (owner decision 2026-08-22); push is a schema slot. Marketing
+    consent is explicit and defaults OFF; critical transactional
+    notifications ignore these toggles entirely.
+  required: [billing, technical, marketing]
+  properties:
+    billing:
+      $ref: '#/ChannelToggles'
+    technical:
+      $ref: '#/ChannelToggles'
+    marketing:
+      $ref: '#/ChannelToggles'
+
+ChannelToggles:
+  type: object
+  required: [email]
+  properties:
+    email:
+      type: boolean
+
+SessionDevice:
+  type: object
+  description: A revocable login session (§15.1). The session itself is server-side; revoking kills it immediately.
+  required: [id, label, ip, last_seen_at, current, created_at]
+  properties:
+    id:
+      type: string
+      format: uuid
+    label:
+      type: string
+      description: Parsed from the user agent (browser on platform).
+    ip:
+      type: string
+    ua:
+      type: [string, 'null']
+    last_seen_at:
+      type: string
+      format: date-time
+    current:
+      type: boolean
+      description: True for the session making this request.
+    created_at:
+      type: string
+      format: date-time
+
+CustomerInvoice:
+  type: object
+  description: Customer view of a billing document. Numbers are gapless per series; issued documents are immutable.
+  required: [id, number, type, status, issue_date, net, vat, gross]
+  properties:
+    id:
+      type: string
+      format: uuid
+    number:
+      type: string
+      description: Display number (e.g. A-000123, PF-000045).
+    type:
+      type: string
+      enum: [proforma, invoice]
+    status:
+      type: string
+      enum: [draft, issued, paid, overdue, void]
+    issue_date:
+      type: string
+      format: date
+    due_date:
+      type: [string, 'null']
+      format: date
+    net:
+      $ref: '#/Money'
+    vat:
+      $ref: '#/Money'
+    gross:
+      $ref: '#/Money'
+    tax_treatment:
+      type: [string, 'null']
+    pdf_available:
+      type: boolean
+    lines:
+      type: array
+      description: Present on show.
+      items:
+        type: object
+        additionalProperties: true
+    created_at:
+      type: string
+      format: date-time
+
+PaymentMethod:
+  type: object
+  description: Saved card handle — the gateway token never leaves the server.
+  required: [id, gateway, is_default, created_at]
+  properties:
+    id:
+      type: string
+      format: uuid
+    gateway:
+      type: string
+    brand:
+      type: [string, 'null']
+    last4:
+      type: [string, 'null']
+    is_default:
+      type: boolean
+    created_at:
+      type: string
+      format: date-time
+
+CreditEntry:
+  type: object
+  description: One credit-ledger movement; delta is signed (credits positive, debits negative).
+  required: [id, delta, reason, balance_after, created_at]
+  properties:
+    id:
+      type: string
+      format: uuid
+    delta:
+      $ref: '#/Money'
+    reason:
+      type: string
+    reference:
+      type: [string, 'null']
+    balance_after:
+      $ref: '#/Money'
+    created_at:
+      type: string
+      format: date-time
+
+UsagePoint:
+  type: object
+  required: [captured_at, disk_mb]
+  properties:
+    captured_at:
+      type: string
+      format: date-time
+    disk_mb:
+      type: integer
+    traffic_mb:
+      type: [integer, 'null']
+    mailboxes:
+      type: [integer, 'null']

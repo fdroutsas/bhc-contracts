@@ -54,6 +54,14 @@
       "description": "Customer services — read + SSO only in v1 (M3)"
     },
     {
+      "name": "notifications",
+      "description": "Notification center + preferences (M5-B, consumer of typed events)"
+    },
+    {
+      "name": "billing",
+      "description": "Billing read surface — documents, methods, credit ledger (M5-B)"
+    },
+    {
       "name": "domains",
       "description": "Domains & DNS — zone status, propagation, guarded record editor (M4, §8)"
     },
@@ -2411,7 +2419,7 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "description": "Not active (SERVICE_NOT_ACTIVE) or plan incompatible (PLAN_NOT_COMPATIBLE).",
+            "description": "Not active (SERVICE_NOT_ACTIVE), cancel scheduled (SERVICE_CANCEL_SCHEDULED) or plan incompatible (PLAN_NOT_COMPATIBLE).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2560,7 +2568,7 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "description": "Not active (SERVICE_NOT_ACTIVE), already present (ADDON_ALREADY_PRESENT), incompatible (PLAN_NOT_COMPATIBLE) or no free dedicated IP (NO_CAPACITY).\n",
+            "description": "Not active (SERVICE_NOT_ACTIVE), cancel scheduled (SERVICE_CANCEL_SCHEDULED), already present (ADDON_ALREADY_PRESENT), incompatible (PLAN_NOT_COMPATIBLE) or no free dedicated IP (NO_CAPACITY).\n",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2568,6 +2576,1038 @@
                 }
               }
             }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/services/{serviceId}/usage": {
+      "get": {
+        "operationId": "services.usage",
+        "tags": [
+          "services"
+        ],
+        "summary": "Usage snapshots for the detail-page bars (disk/traffic/mailboxes)",
+        "parameters": [
+          {
+            "name": "serviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 90,
+              "default": 30
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chronological usage points (may be empty for fresh services).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/UsagePoint"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/services/{serviceId}/cancel": {
+      "post": {
+        "operationId": "services.cancel",
+        "tags": [
+          "services"
+        ],
+        "summary": "Schedule cancellation at period end (graceful, reversible)",
+        "description": "Sets cancel_at_period_end — the J-7 renewal is NOT issued and the service terminates gracefully at next_due. Mutually exclusive with a pending plan change: scheduling a cancel CLEARS any pending change (typed event); while a cancel is scheduled, change-plan and addon purchases answer 409 SERVICE_CANCEL_SCHEDULED until uncancel.\n",
+        "parameters": [
+          {
+            "name": "serviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The service, cancellation scheduled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Service"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Not active (SERVICE_NOT_ACTIVE), already scheduled (SERVICE_CANCEL_SCHEDULED), or the renewal invoice is already issued (SERVICE_CANCEL_LOCKED — support handles the cycle, no surgery on issued documents).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/services/{serviceId}/uncancel": {
+      "post": {
+        "operationId": "services.uncancel",
+        "tags": [
+          "services"
+        ],
+        "summary": "Withdraw a scheduled cancellation",
+        "description": "Clears cancel_at_period_end while the service is still active; the next dunning tick resumes normal renewal issuance.\n",
+        "parameters": [
+          {
+            "name": "serviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The service, back on the renewal track.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Service"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Not active (SERVICE_NOT_ACTIVE) or nothing scheduled (NO_CANCEL_SCHEDULED).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications": {
+      "get": {
+        "operationId": "notifications.index",
+        "tags": [
+          "notifications"
+        ],
+        "summary": "List the account's in-app notifications (newest first)",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "unread",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of notifications plus the unread counter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Notification"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/notifications/read-all": {
+      "post": {
+        "operationId": "notifications.readAll",
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Mark every unread notification of the account as read",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "account_id"
+                ],
+                "properties": {
+                  "account_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "How many were marked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "marked"
+                      ],
+                      "properties": {
+                        "marked": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/notifications/{notificationId}/read": {
+      "post": {
+        "operationId": "notifications.read",
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Mark one notification as read",
+        "parameters": [
+          {
+            "name": "notificationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The notification, now read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Notification"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/notification-preferences": {
+      "get": {
+        "operationId": "notificationPreferences.show",
+        "tags": [
+          "notifications"
+        ],
+        "summary": "The caller's per-category channel toggles",
+        "responses": {
+          "200": {
+            "description": "The preference matrix (defaults if never saved).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/NotificationPreferences"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          }
+        }
+      },
+      "put": {
+        "operationId": "notificationPreferences.update",
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Update the caller's channel toggles (marketing = explicit consent)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationPreferences"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The saved matrix.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/NotificationPreferences"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/auth/sessions": {
+      "get": {
+        "operationId": "auth.sessions.index",
+        "tags": [
+          "auth"
+        ],
+        "summary": "List the caller's active sessions/devices (current one flagged)",
+        "responses": {
+          "200": {
+            "description": "Active sessions, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SessionDevice"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          }
+        }
+      }
+    },
+    "/auth/sessions/{sessionDeviceId}": {
+      "delete": {
+        "operationId": "auth.sessions.revoke",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Revoke a session — kills it server-side, immediately",
+        "parameters": [
+          {
+            "name": "sessionDeviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revoked. Revoking the CURRENT session logs the caller out with this response.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "revoked",
+                        "current"
+                      ],
+                      "properties": {
+                        "revoked": {
+                          "type": "boolean"
+                        },
+                        "current": {
+                          "type": "boolean",
+                          "description": "True when the caller revoked their own session."
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/auth/password": {
+      "put": {
+        "operationId": "auth.passwordChange",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Change the caller's password (current password required)",
+        "description": "Other sessions of the user are evicted by the session password-hash guard on their next request; the current session continues.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "current_password",
+                  "password",
+                  "password_confirmation"
+                ],
+                "properties": {
+                  "current_password": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  },
+                  "password_confirmation": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password changed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "changed"
+                      ],
+                      "properties": {
+                        "changed": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/invoices": {
+      "get": {
+        "operationId": "invoices.index",
+        "tags": [
+          "billing"
+        ],
+        "summary": "List the account's billing documents (newest first)",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of documents.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CustomerInvoice"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/invoices/{invoiceId}": {
+      "get": {
+        "operationId": "invoices.show",
+        "tags": [
+          "billing"
+        ],
+        "summary": "One document with its lines",
+        "parameters": [
+          {
+            "name": "invoiceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CustomerInvoice"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/invoices/{invoiceId}/pdf": {
+      "get": {
+        "operationId": "invoices.pdf",
+        "tags": [
+          "billing"
+        ],
+        "summary": "Download the document PDF",
+        "parameters": [
+          {
+            "name": "invoiceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The rendered PDF (immutable once issued).",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/payment-methods": {
+      "get": {
+        "operationId": "paymentMethods.index",
+        "tags": [
+          "billing"
+        ],
+        "summary": "List the account's saved payment methods",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved methods (tokens never leave the server).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PaymentMethod"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          }
+        }
+      }
+    },
+    "/payment-methods/{paymentMethodId}": {
+      "delete": {
+        "operationId": "paymentMethods.destroy",
+        "tags": [
+          "billing"
+        ],
+        "summary": "Remove a saved payment method",
+        "parameters": [
+          {
+            "name": "paymentMethodId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "deleted"
+                      ],
+                      "properties": {
+                        "deleted": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/payment-methods/{paymentMethodId}/default": {
+      "post": {
+        "operationId": "paymentMethods.setDefault",
+        "tags": [
+          "billing"
+        ],
+        "summary": "Make a saved method the default for off-session charges",
+        "parameters": [
+          {
+            "name": "paymentMethodId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The method, now default.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/PaymentMethod"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/credit-ledger": {
+      "get": {
+        "operationId": "creditLedger.index",
+        "tags": [
+          "billing"
+        ],
+        "summary": "The account's credit ledger (balance trail, newest first)",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of ledger entries.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CreditEntry"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           },
           "422": {
             "$ref": "#/components/responses/ValidationFailed"
@@ -6206,6 +7246,10 @@
               "additionalProperties": true
             }
           },
+          "cancel_at_period_end": {
+            "type": "boolean",
+            "description": "M5-B graceful cancellation flag — mutually exclusive with pending_plan_change (scheduling a cancel clears it; money mutations answer 409 SERVICE_CANCEL_SCHEDULED while set).\n"
+          },
           "pending_plan_change": {
             "description": "Scheduled downgrade (M3.5) — applied at renewal, quota-guarded at J-7 and at application, cancellable until the J-7 invoice issues.\n",
             "anyOf": [
@@ -6307,6 +7351,316 @@
             "$ref": "#/components/schemas/Money"
           },
           "effective_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "UsagePoint": {
+        "type": "object",
+        "required": [
+          "captured_at",
+          "disk_mb"
+        ],
+        "properties": {
+          "captured_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "disk_mb": {
+            "type": "integer"
+          },
+          "traffic_mb": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "mailboxes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        }
+      },
+      "Notification": {
+        "type": "object",
+        "description": "In-app notification row (M5-B) — a routed consumer product of the typed outbox events (golden rule 12). title/body are resolved for the caller's locale; type + payload stay raw for client-side rendering.\n",
+        "required": [
+          "id",
+          "category",
+          "type",
+          "title",
+          "body",
+          "read_at",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "billing",
+              "technical",
+              "marketing"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "description": "The originating outbox event name (e.g. invoice.paid)."
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "read_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ChannelToggles": {
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NotificationPreferences": {
+        "type": "object",
+        "description": "v1: only the EMAIL channel is toggleable per category — in-app is always on (owner decision 2026-08-22); push is a schema slot. Marketing consent is explicit and defaults OFF; critical transactional notifications ignore these toggles entirely.\n",
+        "required": [
+          "billing",
+          "technical",
+          "marketing"
+        ],
+        "properties": {
+          "billing": {
+            "$ref": "#/components/schemas/ChannelToggles"
+          },
+          "technical": {
+            "$ref": "#/components/schemas/ChannelToggles"
+          },
+          "marketing": {
+            "$ref": "#/components/schemas/ChannelToggles"
+          }
+        }
+      },
+      "SessionDevice": {
+        "type": "object",
+        "description": "A revocable login session (§15.1). The session itself is server-side; revoking kills it immediately.",
+        "required": [
+          "id",
+          "label",
+          "ip",
+          "last_seen_at",
+          "current",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "label": {
+            "type": "string",
+            "description": "Parsed from the user agent (browser on platform)."
+          },
+          "ip": {
+            "type": "string"
+          },
+          "ua": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "current": {
+            "type": "boolean",
+            "description": "True for the session making this request."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CustomerInvoice": {
+        "type": "object",
+        "description": "Customer view of a billing document. Numbers are gapless per series; issued documents are immutable.",
+        "required": [
+          "id",
+          "number",
+          "type",
+          "status",
+          "issue_date",
+          "net",
+          "vat",
+          "gross"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "description": "Display number (e.g. A-000123, PF-000045)."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "proforma",
+              "invoice"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "issued",
+              "paid",
+              "overdue",
+              "void"
+            ]
+          },
+          "issue_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "due_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "net": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "vat": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "gross": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "tax_treatment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pdf_available": {
+            "type": "boolean"
+          },
+          "lines": {
+            "type": "array",
+            "description": "Present on show.",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PaymentMethod": {
+        "type": "object",
+        "description": "Saved card handle — the gateway token never leaves the server.",
+        "required": [
+          "id",
+          "gateway",
+          "is_default",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "gateway": {
+            "type": "string"
+          },
+          "brand": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last4": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "is_default": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreditEntry": {
+        "type": "object",
+        "description": "One credit-ledger movement; delta is signed (credits positive, debits negative).",
+        "required": [
+          "id",
+          "delta",
+          "reason",
+          "balance_after",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "delta": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "reference": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "balance_after": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "created_at": {
             "type": "string",
             "format": "date-time"
           }

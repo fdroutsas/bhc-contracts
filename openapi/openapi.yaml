@@ -31,6 +31,10 @@ tags:
     description: Catalog management (products, plans, addons, coupons — audited)
   - name: services
     description: Customer services — read + SSO only in v1 (M3)
+  - name: notifications
+    description: Notification center + preferences (M5-B, consumer of typed events)
+  - name: billing
+    description: Billing read surface — documents, methods, credit ledger (M5-B)
   - name: domains
     description: Domains & DNS — zone status, propagation, guarded record editor (M4, §8)
   - name: admin-infra
@@ -106,6 +110,40 @@ paths:
     $ref: './paths/plan-changes.yaml#/changePlanCancel'
   /services/{serviceId}/addons:
     $ref: './paths/plan-changes.yaml#/serviceAddons'
+  /services/{serviceId}/usage:
+    $ref: './paths/services.yaml#/servicesUsage'
+  /services/{serviceId}/cancel:
+    $ref: './paths/services.yaml#/servicesCancel'
+  /services/{serviceId}/uncancel:
+    $ref: './paths/services.yaml#/servicesUncancel'
+  /notifications:
+    $ref: './paths/notifications.yaml#/notifications'
+  /notifications/read-all:
+    $ref: './paths/notifications.yaml#/notificationsReadAll'
+  /notifications/{notificationId}/read:
+    $ref: './paths/notifications.yaml#/notificationsRead'
+  /notification-preferences:
+    $ref: './paths/notifications.yaml#/notificationPreferences'
+  /auth/sessions:
+    $ref: './paths/sessions.yaml#/sessions'
+  /auth/sessions/{sessionDeviceId}:
+    $ref: './paths/sessions.yaml#/sessionsKey'
+  /auth/password:
+    $ref: './paths/sessions.yaml#/password'
+  /invoices:
+    $ref: './paths/billing.yaml#/invoices'
+  /invoices/{invoiceId}:
+    $ref: './paths/billing.yaml#/invoicesKey'
+  /invoices/{invoiceId}/pdf:
+    $ref: './paths/billing.yaml#/invoicesPdf'
+  /payment-methods:
+    $ref: './paths/billing.yaml#/paymentMethods'
+  /payment-methods/{paymentMethodId}:
+    $ref: './paths/billing.yaml#/paymentMethodsKey'
+  /payment-methods/{paymentMethodId}/default:
+    $ref: './paths/billing.yaml#/paymentMethodsDefault'
+  /credit-ledger:
+    $ref: './paths/billing.yaml#/creditLedger'
   /domains:
     $ref: './paths/domains.yaml#/domains'
   /domains/{domainId}:
