@@ -41,6 +41,18 @@ orders:
                       enum: [monthly, annually]
                     domain:
                       type: [string, 'null']
+                    hostname:
+                      type: [string, 'null']
+                      description: VPS only (M7) — the cloud server hostname.
+                    ssh_key:
+                      type: [string, 'null']
+                      description: >-
+                        VPS only (M7): REQUIRED for vps plans (owner decision
+                        2 — no generated root passwords in v1). OpenSSH
+                        public key format.
+                    location:
+                      type: [string, 'null']
+                      description: VPS only — fsn1|nbg1|hel1 (§12).
                     addon_ids:
                       type: array
                       items:
