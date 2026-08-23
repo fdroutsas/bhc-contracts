@@ -1722,13 +1722,16 @@ AdminIncidentUpdate:
 
 MaintenanceWindow:
   type: object
-  required: [id, server_id, starts_at, ends_at, reason]
+  required: [id, scope, starts_at, ends_at, title]
   properties:
     id:
       type: string
       format: uuid
-    server_id:
+    scope:
       type: string
+      enum: [node, platform]
+    server_id:
+      type: [string, 'null']
       format: uuid
     starts_at:
       type: string
@@ -1736,30 +1739,57 @@ MaintenanceWindow:
     ends_at:
       type: string
       format: date-time
-    reason:
-      type: string
-    public:
-      type: boolean
+    title:
+      type: object
+      properties:
+        el:
+          type: string
+        en:
+          type: string
+    body:
+      type: object
+      additionalProperties: true
+    notify_at:
+      type: [string, 'null']
+      format: date-time
     notified_at:
       type: [string, 'null']
       format: date-time
+    published:
+      type: boolean
 
 MaintenanceWindowWrite:
   type: object
-  required: [server_id, starts_at, ends_at, reason]
+  required: [scope, starts_at, ends_at, title]
   properties:
-    server_id:
+    scope:
       type: string
+      enum: [node, platform]
+    server_id:
+      type: [string, 'null']
       format: uuid
+      description: Required for node scope.
     starts_at:
       type: string
       format: date-time
     ends_at:
       type: string
       format: date-time
-    reason:
-      type: string
-    public:
+    title:
+      type: object
+      required: [el, en]
+      properties:
+        el:
+          type: string
+        en:
+          type: string
+    body:
+      type: object
+      additionalProperties: true
+    notify_at:
+      type: [string, 'null']
+      format: date-time
+    published:
       type: boolean
       default: false
 

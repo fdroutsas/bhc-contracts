@@ -7647,6 +7647,67 @@
         }
       }
     },
+    "/accounts/{account}/data-requests/{dataRequest}/download": {
+      "get": {
+        "operationId": "accounts.data-requests.download",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Download an export artifact (owner + signed URL, double expiry)",
+        "parameters": [
+          {
+            "name": "account",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "dataRequest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The JSON artifact as an attachment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "410": {
+            "description": "Artifact expired or removed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/admin/dashboard": {
       "get": {
         "operationId": "admin.dashboard",
@@ -13268,18 +13329,28 @@
         "type": "object",
         "required": [
           "id",
-          "server_id",
+          "scope",
           "starts_at",
           "ends_at",
-          "reason"
+          "title"
         ],
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid"
           },
-          "server_id": {
+          "scope": {
             "type": "string",
+            "enum": [
+              "node",
+              "platform"
+            ]
+          },
+          "server_id": {
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid"
           },
           "starts_at": {
@@ -13290,11 +13361,27 @@
             "type": "string",
             "format": "date-time"
           },
-          "reason": {
-            "type": "string"
+          "title": {
+            "type": "object",
+            "properties": {
+              "el": {
+                "type": "string"
+              },
+              "en": {
+                "type": "string"
+              }
+            }
           },
-          "public": {
-            "type": "boolean"
+          "body": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "notify_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "notified_at": {
             "type": [
@@ -13302,21 +13389,35 @@
               "null"
             ],
             "format": "date-time"
+          },
+          "published": {
+            "type": "boolean"
           }
         }
       },
       "MaintenanceWindowWrite": {
         "type": "object",
         "required": [
-          "server_id",
+          "scope",
           "starts_at",
           "ends_at",
-          "reason"
+          "title"
         ],
         "properties": {
-          "server_id": {
+          "scope": {
             "type": "string",
-            "format": "uuid"
+            "enum": [
+              "node",
+              "platform"
+            ]
+          },
+          "server_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Required for node scope."
           },
           "starts_at": {
             "type": "string",
@@ -13326,10 +13427,33 @@
             "type": "string",
             "format": "date-time"
           },
-          "reason": {
-            "type": "string"
+          "title": {
+            "type": "object",
+            "required": [
+              "el",
+              "en"
+            ],
+            "properties": {
+              "el": {
+                "type": "string"
+              },
+              "en": {
+                "type": "string"
+              }
+            }
           },
-          "public": {
+          "body": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "notify_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "published": {
             "type": "boolean",
             "default": false
           }

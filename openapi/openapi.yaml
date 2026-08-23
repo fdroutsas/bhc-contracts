@@ -261,6 +261,8 @@ paths:
     $ref: './paths/gdpr.yaml#/accountsExport'
   /accounts/{account}/data-requests:
     $ref: './paths/gdpr.yaml#/accountsDataRequests'
+  /accounts/{account}/data-requests/{dataRequest}/download:
+    $ref: './paths/gdpr.yaml#/accountsDataRequestDownload'
   # ── M8: Admin v1 (§14) — admin hostname only (ADR-0004) ──
   /admin/dashboard:
     $ref: './paths/admin-ops.yaml#/dashboard'

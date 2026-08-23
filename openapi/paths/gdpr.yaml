@@ -70,3 +70,42 @@ accountsDataRequests:
         $ref: '../components/responses.yaml#/Forbidden'
       '404':
         $ref: '../components/responses.yaml#/NotFound'
+
+accountsDataRequestDownload:
+  get:
+    operationId: accounts.data-requests.download
+    tags: [accounts]
+    summary: Download an export artifact (owner + signed URL, double expiry)
+    parameters:
+      - name: account
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: dataRequest
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: The JSON artifact as an attachment.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '410':
+        description: Artifact expired or removed.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
