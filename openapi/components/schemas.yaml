@@ -1401,3 +1401,567 @@ WordpressCard:
       additionalProperties: true
     sso_available:
       type: boolean
+
+# ── M8: Admin v1 + Hardening (non-live) ──────────────────────────────────────
+
+AdminDashboard:
+  type: object
+  required: [mrr_cents, active_services, failed_tasks, open_incidents, orders_under_review, nodes]
+  properties:
+    mrr_cents:
+      type: integer
+      description: Monthly-normalized recurring revenue over active services (snapshot prices).
+    active_services:
+      type: integer
+    failed_tasks:
+      type: integer
+    open_incidents:
+      type: integer
+    orders_under_review:
+      type: integer
+    nodes:
+      type: array
+      description: Per-node utilization + license cost vs MRR (§14 heatmap).
+      items:
+        type: object
+        required: [id, name, role, status, accounts, mrr_cents, monthly_license_cents, monthly_hw_cents]
+        properties:
+          id:
+            type: string
+            format: uuid
+          name:
+            type: string
+          role:
+            type: string
+          status:
+            type: string
+          health_label:
+            type: [string, 'null']
+          accounts:
+            type: integer
+          disk_used_pct:
+            type: [number, 'null']
+          mrr_cents:
+            type: integer
+          monthly_license_cents:
+            type: integer
+          monthly_hw_cents:
+            type: integer
+          margin_cents:
+            type: integer
+
+AdminAccount:
+  type: object
+  required: [id, name, type, country, tax_treatment, fraud_status, created_at]
+  properties:
+    id:
+      type: string
+      format: uuid
+    name:
+      type: string
+      description: Company or person display name.
+    type:
+      type: string
+      enum: [individual, company]
+    country:
+      type: string
+    vat_number:
+      type: [string, 'null']
+    tax_treatment:
+      type: string
+      enum: [gr_standard, eu_reverse, non_eu]
+    fraud_status:
+      type: string
+      enum: [clear, review, blocked]
+    balance_cents:
+      type: integer
+    owner_email:
+      type: [string, 'null']
+      format: email
+    services_count:
+      type: integer
+    unpaid_invoices_count:
+      type: integer
+    created_at:
+      type: string
+      format: date-time
+
+ImpersonationGrant:
+  type: object
+  required: [token, expires_at, portal_url]
+  properties:
+    token:
+      type: string
+      description: One-time, short-TTL exchange token. Consumed by POST /auth/impersonate on the portal host.
+    expires_at:
+      type: string
+      format: date-time
+    portal_url:
+      type: string
+      format: uri
+
+FraudReview:
+  type: object
+  required: [id, order_id, account_id, score, signals, created_at]
+  properties:
+    id:
+      type: string
+      format: uuid
+    order_id:
+      type: string
+      format: uuid
+    account_id:
+      type: string
+      format: uuid
+    score:
+      type: integer
+    signals:
+      type: object
+      additionalProperties: true
+      description: Scoring breakdown (disposable_email, velocity_ip, velocity_email, …).
+    decision:
+      type: [string, 'null']
+      enum: [approve, reject, null]
+    decided_by:
+      type: [string, 'null']
+      format: uuid
+    decided_at:
+      type: [string, 'null']
+      format: date-time
+    created_at:
+      type: string
+      format: date-time
+
+AdminService:
+  type: object
+  required: [id, account_id, product_key, plan_key, status, price_cents, created_at]
+  description: Ops view — includes node placement and external refs (never shown to customers).
+  properties:
+    id:
+      type: string
+      format: uuid
+    account_id:
+      type: string
+      format: uuid
+    server_id:
+      type: [string, 'null']
+      format: uuid
+    product_key:
+      type: string
+    plan_key:
+      type: string
+    domain:
+      type: [string, 'null']
+    status:
+      type: string
+    price_cents:
+      type: integer
+    next_due_at:
+      type: [string, 'null']
+      format: date-time
+    cancel_at_period_end:
+      type: boolean
+    pending_plan_change:
+      type: [object, 'null']
+      additionalProperties: true
+    external_refs:
+      type: object
+      additionalProperties: true
+    created_at:
+      type: string
+      format: date-time
+
+AdminInvoice:
+  type: object
+  required: [id, account_id, series, number, type, status, totals, issued_at]
+  properties:
+    id:
+      type: string
+      format: uuid
+    account_id:
+      type: string
+      format: uuid
+    series:
+      type: string
+    number:
+      type: integer
+    type:
+      type: string
+      enum: [proforma, invoice, credit_note]
+    status:
+      type: string
+    totals:
+      $ref: '#/Totals'
+    taxdoc:
+      type: object
+      description: Fiscal transmission state (myDATA status + resubmit surface, §14).
+      properties:
+        status:
+          type: string
+          enum: [pending, submitted, failed, not_required]
+        mark:
+          type: [string, 'null']
+        last_error:
+          type: [string, 'null']
+    issued_at:
+      type: string
+      format: date-time
+
+AdminPayment:
+  type: object
+  required: [id, account_id, amount_cents, kind, provider, created_at]
+  properties:
+    id:
+      type: string
+      format: uuid
+    account_id:
+      type: string
+      format: uuid
+    invoice_id:
+      type: [string, 'null']
+      format: uuid
+    amount_cents:
+      type: integer
+    kind:
+      type: string
+    provider:
+      type: string
+    gateway_refs:
+      type: object
+      additionalProperties: true
+    created_at:
+      type: string
+      format: date-time
+
+DunningEvent:
+  type: object
+  required: [id, invoice_id, stage, occurred_at]
+  properties:
+    id:
+      type: string
+      format: uuid
+    invoice_id:
+      type: string
+      format: uuid
+    stage:
+      type: string
+      description: Ladder stage (J-7, J0, J+3, J+7, J+30 …).
+    occurred_at:
+      type: string
+      format: date-time
+    meta:
+      type: object
+      additionalProperties: true
+
+AdminMonitor:
+  type: object
+  required: [id, kind, active]
+  properties:
+    id:
+      type: string
+      format: uuid
+    service_id:
+      type: [string, 'null']
+      format: uuid
+    server_id:
+      type: [string, 'null']
+      format: uuid
+    kind:
+      type: string
+    active:
+      type: boolean
+    paused_reason:
+      type: [string, 'null']
+    consecutive_failures:
+      type: integer
+    last_checked_at:
+      type: [string, 'null']
+      format: date-time
+
+AdminIncident:
+  type: object
+  required: [id, scope, status, public, started_at]
+  properties:
+    id:
+      type: string
+      format: uuid
+    scope:
+      type: string
+    service_id:
+      type: [string, 'null']
+      format: uuid
+    server_id:
+      type: [string, 'null']
+      format: uuid
+    status:
+      type: string
+      enum: [open, resolved]
+    public:
+      type: boolean
+      description: Explicit ops flag — only public incidents reach the status page (M6 exposure doctrine).
+    note:
+      type: [string, 'null']
+    started_at:
+      type: string
+      format: date-time
+    resolved_at:
+      type: [string, 'null']
+      format: date-time
+
+AdminIncidentUpdate:
+  type: object
+  properties:
+    status:
+      type: string
+      enum: [resolved]
+      description: Manual resolve. Reopening is the prober's job, not an admin verb.
+    public:
+      type: boolean
+    note:
+      type: [string, 'null']
+
+MaintenanceWindow:
+  type: object
+  required: [id, server_id, starts_at, ends_at, reason]
+  properties:
+    id:
+      type: string
+      format: uuid
+    server_id:
+      type: string
+      format: uuid
+    starts_at:
+      type: string
+      format: date-time
+    ends_at:
+      type: string
+      format: date-time
+    reason:
+      type: string
+    public:
+      type: boolean
+    notified_at:
+      type: [string, 'null']
+      format: date-time
+
+MaintenanceWindowWrite:
+  type: object
+  required: [server_id, starts_at, ends_at, reason]
+  properties:
+    server_id:
+      type: string
+      format: uuid
+    starts_at:
+      type: string
+      format: date-time
+    ends_at:
+      type: string
+      format: date-time
+    reason:
+      type: string
+    public:
+      type: boolean
+      default: false
+
+SupportRequest:
+  type: object
+  required: [id, account_id, kind, status, created_at]
+  description: One queue, two kinds (§19 M8) — migrations and concierge domain registrations. Source credentials are write-only and never appear here.
+  properties:
+    id:
+      type: string
+      format: uuid
+    account_id:
+      type: string
+      format: uuid
+    service_id:
+      type: [string, 'null']
+      format: uuid
+    kind:
+      type: string
+      enum: [migration, domain_registration]
+    status:
+      type: string
+      enum: [new, in_progress, waiting_customer, done]
+    assignee:
+      type: [string, 'null']
+      format: uuid
+    notes:
+      type: [string, 'null']
+    timeline:
+      type: array
+      items:
+        type: object
+        additionalProperties: true
+    meta:
+      type: object
+      additionalProperties: true
+      description: Kind-specific facts (fqdn/years for domain_registration; backup upload state for migration).
+    created_at:
+      type: string
+      format: date-time
+
+MigrationRequestWrite:
+  type: object
+  required: [account_id, source_kind]
+  properties:
+    account_id:
+      type: string
+      format: uuid
+    service_id:
+      type: [string, 'null']
+      format: uuid
+    source_kind:
+      type: string
+      enum: [panel_creds, backup_upload]
+    panel_url:
+      type: [string, 'null']
+      format: uri
+    panel_username:
+      type: [string, 'null']
+    panel_password:
+      type: [string, 'null']
+      writeOnly: true
+      description: Encrypted at rest; never returned by any endpoint.
+    notes:
+      type: [string, 'null']
+
+DomainRequestWrite:
+  type: object
+  required: [account_id, fqdn, years]
+  properties:
+    account_id:
+      type: string
+      format: uuid
+    fqdn:
+      type: string
+    years:
+      type: integer
+      minimum: 1
+      maximum: 10
+    notes:
+      type: [string, 'null']
+
+SupportRequestAdminUpdate:
+  type: object
+  properties:
+    status:
+      type: string
+      enum: [new, in_progress, waiting_customer, done]
+    assignee:
+      type: [string, 'null']
+      format: uuid
+    notes:
+      type: [string, 'null']
+
+Announcement:
+  type: object
+  required: [id, title, body, category, created_at]
+  properties:
+    id:
+      type: string
+      format: uuid
+    title:
+      type: object
+      required: [el, en]
+      properties:
+        el:
+          type: string
+        en:
+          type: string
+    body:
+      type: object
+      required: [el, en]
+      properties:
+        el:
+          type: string
+        en:
+          type: string
+    category:
+      type: string
+      enum: [technical, marketing]
+      description: Routed through the M5-B notification table — marketing is consent-gated, nothing critical ships as a broadcast.
+    published_at:
+      type: [string, 'null']
+      format: date-time
+    created_by:
+      type: [string, 'null']
+      format: uuid
+    created_at:
+      type: string
+      format: date-time
+
+AnnouncementWrite:
+  type: object
+  required: [title, body, category]
+  properties:
+    title:
+      type: object
+      required: [el, en]
+      properties:
+        el:
+          type: string
+        en:
+          type: string
+    body:
+      type: object
+      required: [el, en]
+      properties:
+        el:
+          type: string
+        en:
+          type: string
+    category:
+      type: string
+      enum: [technical, marketing]
+
+AuditLogEntry:
+  type: object
+  required: [id, actor_type, action, created_at]
+  properties:
+    id:
+      type: string
+      format: uuid
+    actor_type:
+      type: string
+      enum: [admin, user, system]
+    actor_id:
+      type: [string, 'null']
+      format: uuid
+    account_id:
+      type: [string, 'null']
+      format: uuid
+    action:
+      type: string
+    subject_type:
+      type: [string, 'null']
+    subject_id:
+      type: [string, 'null']
+    ip:
+      type: [string, 'null']
+    meta:
+      type: object
+      additionalProperties: true
+    created_at:
+      type: string
+      format: date-time
+
+DataRequest:
+  type: object
+  required: [id, kind, status, created_at]
+  properties:
+    id:
+      type: string
+      format: uuid
+    kind:
+      type: string
+      enum: [export, delete]
+    status:
+      type: string
+      enum: [pending, processing, done, failed, rejected]
+    file_expires_at:
+      type: [string, 'null']
+      format: date-time
+    created_at:
+      type: string
+      format: date-time

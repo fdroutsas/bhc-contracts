@@ -110,6 +110,56 @@ show:
       '422':
         $ref: '../components/responses.yaml#/ValidationFailed'
 
+  delete:
+    operationId: accounts.destroy
+    tags: [accounts]
+    summary: GDPR account deletion (owner + password + TOTP, eligibility-gated)
+    description: >
+      ADR-0005 (M8): eligible only with no live services and no open debt.
+      PII is anonymized; fiscal documents are retained per Greek tax law —
+      the retention interpretation is the lawyer's (launch-tail flag), the
+      mechanism is this endpoint.
+    parameters:
+      - $ref: '#/components-accountId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [password]
+            properties:
+              password:
+                type: string
+              code:
+                type: [string, 'null']
+                description: Current TOTP code — required when the owner has TOTP enabled.
+    responses:
+      '202':
+        description: Deletion accepted and queued (DataRequest trail).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/DataRequest'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: Live services or open debt (ACCOUNT_NOT_ELIGIBLE_FOR_DELETION).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
 viesCheck:
   post:
     operationId: vies.check

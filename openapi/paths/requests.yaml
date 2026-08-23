@@ -1,0 +1,151 @@
+# M8 — customer side of the ONE support queue (spec §19 M8, v1.6): migration
+# wizard + concierge domain registration. Backup uploads live behind §15.7:
+# private storage, size caps, AV scan seam, signed URLs — never public paths.
+
+requests:
+  get:
+    operationId: requests.index
+    tags: [requests]
+    summary: List the account's migration/domain requests
+    parameters:
+      - name: account_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: The account's requests, newest first.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/SupportRequest'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+requestsMigration:
+  post:
+    operationId: requests.migration.store
+    tags: [requests]
+    summary: Open a migration request (panel creds encrypted, or backup upload to follow)
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/MigrationRequestWrite'
+    responses:
+      '201':
+        description: Request queued (typed event emitted; the admin queue picks it up).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/SupportRequest'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+requestsDomain:
+  post:
+    operationId: requests.domain.store
+    tags: [requests]
+    summary: Concierge domain registration request (manual by us until M9)
+    description: >
+      v1.6 decision — an availability check without purchase would send
+      customers to a competing registrar, so v1 checkout is BYO-only and
+      registration requests land in the same queue as migrations.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/DomainRequestWrite'
+    responses:
+      '201':
+        description: Request queued.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/SupportRequest'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+requestsBackup:
+  post:
+    operationId: requests.backup.upload
+    tags: [requests]
+    summary: Attach a backup archive to a migration request (§15.7 upload rules)
+    parameters:
+      - name: request
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [file]
+            properties:
+              file:
+                type: string
+                format: binary
+                description: Size-capped archive; stored on a private disk, AV-scanned before any admin touches it.
+    responses:
+      '201':
+        description: Upload accepted and queued for the AV scan; state lands in the request meta.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/SupportRequest'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: Request is not a migration or already carries a clean upload (REQUEST_UPLOAD_NOT_ALLOWED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '413':
+        description: Archive exceeds the size cap (UPLOAD_TOO_LARGE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
