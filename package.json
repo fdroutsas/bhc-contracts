@@ -7,9 +7,23 @@
         "lint": "redocly lint openapi/openapi.yaml",
         "bundle": "redocly bundle openapi/openapi.yaml -o dist/openapi.json",
         "bundle:check": "npm run bundle && git diff --exit-code dist/",
-        "preview": "redocly preview-docs openapi/openapi.yaml"
+        "preview": "redocly preview-docs openapi/openapi.yaml",
+        "generate:client": "openapi-typescript",
+        "client:check": "npm run generate:client && git diff --exit-code dist/client/",
+        "check": "npm run lint && npm run bundle && npm run generate:client && git diff --exit-code dist/"
     },
     "devDependencies": {
-        "@redocly/cli": "^2.0.0"
-    }
+        "@redocly/cli": "^2.0.0",
+        "openapi-typescript": "7.13.0"
+    },
+    "types": "./dist/client/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/client/index.d.ts"
+        }
+    },
+    "files": [
+        "dist/client",
+        "dist/openapi.json"
+    ]
 }

@@ -21,4 +21,7 @@ jobs:
             # dist/openapi.json is the committed artifact bhc-api consumes —
             # regenerating it must produce no diff.
             - run: npm run bundle
+            # dist/client is the committed TS surface both SPAs consume —
+            # regenerating it must produce no diff either (T0, SPA phase).
+            - run: npm run generate:client
             - run: git diff --exit-code dist/

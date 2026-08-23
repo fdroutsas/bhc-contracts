@@ -26,11 +26,20 @@ npm run preview       # local docs preview
 ## Conventions
 
 - Paths are **server-relative** — the `/api/v1` prefix lives in `servers[].url`.
-- operationIds are dot-namespaced (`auth.login`, `admin.settings.update`) and feed the TS client generation that lands at M5.
+- operationIds are dot-namespaced (`auth.login`, `admin.settings.update`); the TS surface generates from the same source (`npm run generate:client` → `dist/client/`).
 - Errors are RFC 9457 `application/problem+json` with a stable `code` member (see `components/schemas.yaml#/Problem`).
 - Money (from M1 on): `{ amount: int cents, currency: "EUR" }`. Timestamps UTC ISO 8601.
 
 ## Consumers
 
 - `bhc-api` — drift gate against `dist/openapi.json` (sibling checkout locally, second `actions/checkout` in CI; override the path with `BHC_CONTRACTS_SPEC`).
-- `bhc-portal` / `bhc-admin` (M5+) — generated TS clients.
+- `bhc-admin` / `bhc-portal` — the committed TS surface in `dist/client/` (types only, zero runtime; SPA phase T0).
+
+## TS client (SPA phase, owner Δ1)
+
+ONE client, generated ONLY here, consumed by both SPAs — zero skew by construction:
+
+- `npm run generate:client` → `dist/client/schema.d.ts` via openapi-typescript (output declared in `redocly.yaml`); `dist/client/index.d.ts` is the package surface (`paths`, `components`, `operations`).
+- **Freshness gate**: CI regenerates bundle AND client, then `git diff --exit-code dist/` — the two artifacts are locked to one commit.
+- **Consumption**: git dependency **pinned to a SHA** (`"@bithosting/bhc-contracts": "github:fdroutsas/bhc-contracts#<sha>"`) + `openapi-fetch` as the runtime in the SPA. The SPA repos carry a pin-hygiene CI check against this repo's `main` — the `.contracts-ref` doctrine, translated to `package.json`.
+- Hand-written wire types or bare `fetch` calls in the SPAs are gate failures there — this surface is the single API truth.
