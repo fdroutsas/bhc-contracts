@@ -43,6 +43,10 @@ tags:
     description: Servers, provisioning monitor, reconciliation (M3 — audited)
   - name: nodes
     description: Golden-node self-registration over WireGuard (spec §16)
+  - name: requests
+    description: Migration wizard + concierge domain registrations — one queue (M8)
+  - name: admin-ops
+    description: Admin v1 (§14) — dashboard, accounts, orders/fraud, services, billing, monitoring, queue, broadcasts, audit (M8; admin hostname only, ADR-0004)
 security:
   - cookieAuth: []
 paths:
@@ -242,6 +246,86 @@ paths:
     $ref: './paths/admin-catalog.yaml#/coupons'
   /admin/catalog/coupons/{id}:
     $ref: './paths/admin-catalog.yaml#/couponsKey'
+  # ── M8: customer legs (requests queue, GDPR, impersonation exchange) ──
+  /auth/impersonate:
+    $ref: './paths/auth.yaml#/impersonate'
+  /requests:
+    $ref: './paths/requests.yaml#/requests'
+  /requests/migration:
+    $ref: './paths/requests.yaml#/requestsMigration'
+  /requests/domain-registration:
+    $ref: './paths/requests.yaml#/requestsDomain'
+  /requests/{request}/backup:
+    $ref: './paths/requests.yaml#/requestsBackup'
+  /accounts/{account}/export:
+    $ref: './paths/gdpr.yaml#/accountsExport'
+  /accounts/{account}/data-requests:
+    $ref: './paths/gdpr.yaml#/accountsDataRequests'
+  /accounts/{account}/data-requests/{dataRequest}/download:
+    $ref: './paths/gdpr.yaml#/accountsDataRequestDownload'
+  # ── M8: Admin v1 (§14) — admin hostname only (ADR-0004) ──
+  /admin/dashboard:
+    $ref: './paths/admin-ops.yaml#/dashboard'
+  /admin/accounts:
+    $ref: './paths/admin-ops.yaml#/accounts'
+  /admin/accounts/{account}:
+    $ref: './paths/admin-ops.yaml#/accountsKey'
+  /admin/accounts/{account}/impersonate:
+    $ref: './paths/admin-ops.yaml#/accountsImpersonate'
+  /admin/orders:
+    $ref: './paths/admin-ops.yaml#/orders'
+  /admin/orders/{order}:
+    $ref: './paths/admin-ops.yaml#/ordersKey'
+  /admin/fraud-reviews:
+    $ref: './paths/admin-ops.yaml#/fraudReviews'
+  /admin/fraud-reviews/{review}/approve:
+    $ref: './paths/admin-ops.yaml#/fraudApprove'
+  /admin/fraud-reviews/{review}/reject:
+    $ref: './paths/admin-ops.yaml#/fraudReject'
+  /admin/services:
+    $ref: './paths/admin-ops.yaml#/services'
+  /admin/services/{service}:
+    $ref: './paths/admin-ops.yaml#/servicesKey'
+  /admin/services/{service}/suspend:
+    $ref: './paths/admin-ops.yaml#/servicesSuspend'
+  /admin/services/{service}/unsuspend:
+    $ref: './paths/admin-ops.yaml#/servicesUnsuspend'
+  /admin/services/{service}/terminate:
+    $ref: './paths/admin-ops.yaml#/servicesTerminate'
+  /admin/services/{service}/change-plan:
+    $ref: './paths/admin-ops.yaml#/servicesChangePlan'
+  /admin/services/{service}/pending-change:
+    $ref: './paths/admin-ops.yaml#/servicesPendingChange'
+  /admin/services/{service}/dunning:
+    $ref: './paths/admin-ops.yaml#/servicesDunning'
+  /admin/invoices:
+    $ref: './paths/admin-ops.yaml#/invoices'
+  /admin/invoices/{invoice}:
+    $ref: './paths/admin-ops.yaml#/invoicesKey'
+  /admin/invoices/{invoice}/taxdoc/resubmit:
+    $ref: './paths/admin-ops.yaml#/invoicesTaxdocResubmit'
+  /admin/payments:
+    $ref: './paths/admin-ops.yaml#/payments'
+  /admin/monitors:
+    $ref: './paths/admin-ops.yaml#/monitors'
+  /admin/incidents:
+    $ref: './paths/admin-ops.yaml#/incidents'
+  /admin/incidents/{incident}:
+    $ref: './paths/admin-ops.yaml#/incidentsKey'
+  /admin/maintenance-windows:
+    $ref: './paths/admin-ops.yaml#/maintenanceWindows'
+  /admin/maintenance-windows/{window}:
+    $ref: './paths/admin-ops.yaml#/maintenanceWindowsKey'
+  /admin/maintenance-windows/{window}/notify:
+    $ref: './paths/admin-ops.yaml#/maintenanceWindowsNotify'
+  /admin/requests:
+    $ref: './paths/admin-ops.yaml#/requests'
+  /admin/requests/{request}:
+    $ref: './paths/admin-ops.yaml#/requestsKey'
+  /admin/announcements:
+    $ref: './paths/admin-ops.yaml#/announcements'
+  /admin/audit-logs:
+    $ref: './paths/admin-ops.yaml#/auditLogs'
 components:
   securitySchemes:
     cookieAuth:

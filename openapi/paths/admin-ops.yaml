@@ -1,0 +1,1365 @@
+# M8 — Admin v1 (spec §14, non-live build). Every op: admin guard on the
+# admin HOSTNAME (ADR-0004) + mandatory TOTP + permission policy; mutations
+# audited. Money-moving admin verbs deliberately DO NOT exist: admin
+# change-plan is schedule-at-renewal only (owner Δ2 — no admin ever charges
+# a customer card without fresh customer intent), exceptions go through the
+# existing credit adjustment.
+
+dashboard:
+  get:
+    operationId: admin.dashboard
+    tags: [admin-ops]
+    summary: Ops dashboard aggregates (MRR, nodes, license cost vs MRR, failures)
+    responses:
+      '200':
+        description: Cached (60s) aggregates for the §14 dashboard.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminDashboard'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+accounts:
+  get:
+    operationId: admin.accounts.index
+    tags: [admin-ops]
+    summary: Search accounts (name, VAT, owner email — cursor-paginated)
+    parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: fraud_status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [clear, review, blocked]
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+    responses:
+      '200':
+        description: One page of accounts.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/AdminAccount'
+                links:
+                  type: object
+                  additionalProperties: true
+                meta:
+                  type: object
+                  additionalProperties: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+accountsKey:
+  get:
+    operationId: admin.accounts.show
+    tags: [admin-ops]
+    summary: Account detail (profile, services, invoices, credit)
+    parameters:
+      - name: account
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: Full ops view of one account.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [account]
+                  properties:
+                    account:
+                      $ref: '../components/schemas.yaml#/AdminAccount'
+                    services:
+                      type: array
+                      items:
+                        $ref: '../components/schemas.yaml#/AdminService'
+                    invoices:
+                      type: array
+                      items:
+                        $ref: '../components/schemas.yaml#/AdminInvoice'
+                    credit:
+                      type: array
+                      items:
+                        $ref: '../components/schemas.yaml#/CreditEntry'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+accountsImpersonate:
+  post:
+    operationId: admin.accounts.impersonate
+    tags: [admin-ops]
+    summary: Issue a one-time login-as-customer grant (banner + full audit)
+    description: >
+      Returns a short-TTL one-time token the portal exchanges via POST
+      /auth/impersonate on the api host — hosts never share cookies
+      (ADR-0004). The resulting portal session is flagged: every audit row
+      carries the acting admin, /auth/me exposes impersonated_by for the
+      banner, and three paths are excluded outright (owner Δ3): payment
+      execution, account deletion, and customer credential/identity changes
+      (email, password, TOTP) — each answers 403 and is audited.
+    parameters:
+      - name: account
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '201':
+        description: Grant issued (audited as service-handling access).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/ImpersonationGrant'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+orders:
+  get:
+    operationId: admin.orders.index
+    tags: [admin-ops]
+    summary: List orders (status/account filters, cursor-paginated)
+    parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: account_id
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+    responses:
+      '200':
+        description: One page of orders.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/Order'
+                links:
+                  type: object
+                  additionalProperties: true
+                meta:
+                  type: object
+                  additionalProperties: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+ordersKey:
+  get:
+    operationId: admin.orders.show
+    tags: [admin-ops]
+    summary: Order detail (lines, totals, fraud score)
+    parameters:
+      - name: order
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: One order.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/Order'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+fraudReviews:
+  get:
+    operationId: admin.fraud.index
+    tags: [admin-ops]
+    summary: Fraud review queue (§15.8 — pending first)
+    parameters:
+      - name: decided
+        in: query
+        required: false
+        schema:
+          type: boolean
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+    responses:
+      '200':
+        description: One page of reviews.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/FraudReview'
+                links:
+                  type: object
+                  additionalProperties: true
+                meta:
+                  type: object
+                  additionalProperties: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+fraudApprove:
+  post:
+    operationId: admin.fraud.approve
+    tags: [admin-ops]
+    summary: Approve a reviewed order — it may proceed to payment (audited)
+    parameters:
+      - name: review
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: Review decided; order released to pending_payment.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/FraudReview'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: Already decided (FRAUD_REVIEW_DECIDED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+fraudReject:
+  post:
+    operationId: admin.fraud.reject
+    tags: [admin-ops]
+    summary: Reject a reviewed order — cancelled; optionally block the account (audited)
+    parameters:
+      - name: review
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              block_account:
+                type: boolean
+                default: false
+    responses:
+      '200':
+        description: Review decided; order cancelled.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/FraudReview'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: Already decided (FRAUD_REVIEW_DECIDED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+services:
+  get:
+    operationId: admin.services.index
+    tags: [admin-ops]
+    summary: Search services (domain/account/status/product, cursor-paginated)
+    parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: account_id
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+    responses:
+      '200':
+        description: One page of services (ops view).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/AdminService'
+                links:
+                  type: object
+                  additionalProperties: true
+                meta:
+                  type: object
+                  additionalProperties: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+servicesKey:
+  get:
+    operationId: admin.services.show
+    tags: [admin-ops]
+    summary: Service detail — placement, refs, pending change, provision timeline
+    parameters:
+      - name: service
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: One service (ops view).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminService'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+servicesSuspend:
+  post:
+    operationId: admin.services.suspend
+    tags: [admin-ops]
+    summary: Suspend a service via the state machine (reason required, audited)
+    parameters:
+      - name: service
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [reason]
+            properties:
+              reason:
+                type: string
+    responses:
+      '200':
+        description: Transition applied; consumers act via the outbox.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminService'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: Transition not allowed from the current status (SERVICE_TRANSITION_INVALID).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+servicesUnsuspend:
+  post:
+    operationId: admin.services.unsuspend
+    tags: [admin-ops]
+    summary: Unsuspend a service via the state machine (audited)
+    parameters:
+      - name: service
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [reason]
+            properties:
+              reason:
+                type: string
+    responses:
+      '200':
+        description: Transition applied.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminService'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: Transition not allowed from the current status (SERVICE_TRANSITION_INVALID).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+servicesTerminate:
+  post:
+    operationId: admin.services.terminate
+    tags: [admin-ops]
+    summary: Terminate a service via the state machine (irreversible, confirm + audited)
+    parameters:
+      - name: service
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [reason, confirm]
+            properties:
+              reason:
+                type: string
+              confirm:
+                type: boolean
+                description: Must be true — terminate deletes data downstream.
+    responses:
+      '200':
+        description: Transition applied; the node leg runs final backup before removal.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminService'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: Not confirmed (CONFIRM_REQUIRED) or transition invalid (SERVICE_TRANSITION_INVALID).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+servicesChangePlan:
+  post:
+    operationId: admin.services.change-plan
+    tags: [admin-ops]
+    summary: Schedule a plan change at renewal (owner Δ2 — never an immediate charge)
+    description: >
+      Rides the M3.5 engine's scheduled path only: pending_plan_change is
+      recorded and the J-7/renewal guards apply it. No money moves now and
+      no admin verb ever charges a saved card — exceptions are handled with
+      the existing credit adjustment plus the customer's own upgrade flow.
+    parameters:
+      - name: service
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [plan_id]
+            properties:
+              plan_id:
+                type: string
+                format: uuid
+    responses:
+      '200':
+        description: Change scheduled for the next renewal.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminService'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: Cancel scheduled, incompatible target, or state guard (SERVICE_CANCEL_SCHEDULED / PLAN_NOT_COMPATIBLE / SERVICE_NOT_ACTIVE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+servicesPendingChange:
+  delete:
+    operationId: admin.services.pending-change.cancel
+    tags: [admin-ops]
+    summary: Cancel a pending plan change (audited)
+    parameters:
+      - name: service
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: Pending change cleared.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminService'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: Nothing pending (NO_PENDING_PLAN_CHANGE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+servicesDunning:
+  get:
+    operationId: admin.services.dunning
+    tags: [admin-ops]
+    summary: Dunning timeline for a service (ladder events per invoice)
+    parameters:
+      - name: service
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: Dunning events, newest first.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/DunningEvent'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+invoices:
+  get:
+    operationId: admin.invoices.index
+    tags: [admin-ops]
+    summary: List invoices/credit notes (type/status/account/period filters)
+    parameters:
+      - name: type
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [proforma, invoice, credit_note]
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: account_id
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+    responses:
+      '200':
+        description: One page of documents.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/AdminInvoice'
+                links:
+                  type: object
+                  additionalProperties: true
+                meta:
+                  type: object
+                  additionalProperties: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+invoicesKey:
+  get:
+    operationId: admin.invoices.show
+    tags: [admin-ops]
+    summary: Invoice detail (lines, payments, fiscal state)
+    parameters:
+      - name: invoice
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: One document with payments.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminInvoice'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+invoicesTaxdocResubmit:
+  post:
+    operationId: admin.invoices.taxdoc.resubmit
+    tags: [admin-ops]
+    summary: Re-queue a failed fiscal transmission (myDATA resubmit, audited)
+    parameters:
+      - name: invoice
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '202':
+        description: Resubmission queued through the tax-doc adapter.
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: Document has a MARK already or needs no transmission (TAXDOC_NOT_RESUBMITTABLE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+payments:
+  get:
+    operationId: admin.payments.index
+    tags: [admin-ops]
+    summary: List payments (account/provider filters, cursor-paginated)
+    parameters:
+      - name: account_id
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: provider
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+    responses:
+      '200':
+        description: One page of payments.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/AdminPayment'
+                links:
+                  type: object
+                  additionalProperties: true
+                meta:
+                  type: object
+                  additionalProperties: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+monitors:
+  get:
+    operationId: admin.monitors.index
+    tags: [admin-ops]
+    summary: List monitors (active/paused, per service or node)
+    parameters:
+      - name: active
+        in: query
+        required: false
+        schema:
+          type: boolean
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+    responses:
+      '200':
+        description: One page of monitors.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/AdminMonitor'
+                links:
+                  type: object
+                  additionalProperties: true
+                meta:
+                  type: object
+                  additionalProperties: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+incidents:
+  get:
+    operationId: admin.incidents.index
+    tags: [admin-ops]
+    summary: List incidents (open first, scope filters)
+    parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [open, resolved]
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+    responses:
+      '200':
+        description: One page of incidents.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/AdminIncident'
+                links:
+                  type: object
+                  additionalProperties: true
+                meta:
+                  type: object
+                  additionalProperties: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+incidentsKey:
+  put:
+    operationId: admin.incidents.update
+    tags: [admin-ops]
+    summary: Update an incident — manual resolve, public flag, note (audited)
+    parameters:
+      - name: incident
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/AdminIncidentUpdate'
+    responses:
+      '200':
+        description: Incident updated; the status page reflects public incidents only.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/AdminIncident'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+maintenanceWindows:
+  get:
+    operationId: admin.maintenance.index
+    tags: [admin-ops]
+    summary: List maintenance windows
+    parameters:
+      - name: upcoming
+        in: query
+        required: false
+        schema:
+          type: boolean
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+    responses:
+      '200':
+        description: One page of windows.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/MaintenanceWindow'
+                links:
+                  type: object
+                  additionalProperties: true
+                meta:
+                  type: object
+                  additionalProperties: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+  post:
+    operationId: admin.maintenance.store
+    tags: [admin-ops]
+    summary: Compose a maintenance window (audited; CLI remains)
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/MaintenanceWindowWrite'
+    responses:
+      '201':
+        description: Window created.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/MaintenanceWindow'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+maintenanceWindowsKey:
+  put:
+    operationId: admin.maintenance.update
+    tags: [admin-ops]
+    summary: Update a maintenance window (audited)
+    parameters:
+      - name: window
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/MaintenanceWindowWrite'
+    responses:
+      '200':
+        description: Window updated.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/MaintenanceWindow'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+maintenanceWindowsNotify:
+  post:
+    operationId: admin.maintenance.notify
+    tags: [admin-ops]
+    summary: Notify affected customers exactly once (M6 semantics preserved)
+    parameters:
+      - name: window
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '202':
+        description: Fan-out queued; notified_at stamps exactly-once.
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: Already notified (MAINTENANCE_ALREADY_NOTIFIED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+requests:
+  get:
+    operationId: admin.requests.index
+    tags: [admin-ops]
+    summary: Migration + concierge queue (kind/status filters)
+    parameters:
+      - name: kind
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [migration, domain_registration]
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [new, in_progress, waiting_customer, done]
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+    responses:
+      '200':
+        description: One page of requests.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/SupportRequest'
+                links:
+                  type: object
+                  additionalProperties: true
+                meta:
+                  type: object
+                  additionalProperties: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+requestsKey:
+  get:
+    operationId: admin.requests.show
+    tags: [admin-ops]
+    summary: Request detail (timeline; credentials stay write-only)
+    parameters:
+      - name: request
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: One request.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/SupportRequest'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+  put:
+    operationId: admin.requests.update
+    tags: [admin-ops]
+    summary: Work the queue — status/assignee/notes (typed events on change, audited)
+    parameters:
+      - name: request
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/SupportRequestAdminUpdate'
+    responses:
+      '200':
+        description: Request updated.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/SupportRequest'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+announcements:
+  get:
+    operationId: admin.announcements.index
+    tags: [admin-ops]
+    summary: List broadcast announcements
+    parameters:
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+    responses:
+      '200':
+        description: One page of announcements.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/Announcement'
+                links:
+                  type: object
+                  additionalProperties: true
+                meta:
+                  type: object
+                  additionalProperties: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+  post:
+    operationId: admin.announcements.store
+    tags: [admin-ops]
+    summary: Publish a broadcast (router-gated fan-out — marketing needs consent)
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/AnnouncementWrite'
+    responses:
+      '201':
+        description: Announcement published; chunked fan-out queued through the notification router.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/Announcement'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
+
+auditLogs:
+  get:
+    operationId: admin.audit.index
+    tags: [admin-ops]
+    summary: Audit log viewer (actor/action/subject/date filters, partition-friendly)
+    parameters:
+      - name: actor_type
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [admin, user, system]
+      - name: actor_id
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: action
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: subject_id
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+    responses:
+      '200':
+        description: One page of audit rows (default window last 7 days).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/AuditLogEntry'
+                links:
+                  type: object
+                  additionalProperties: true
+                meta:
+                  type: object
+                  additionalProperties: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'

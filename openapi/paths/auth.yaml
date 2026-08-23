@@ -295,8 +295,49 @@ me:
               properties:
                 data:
                   $ref: '../components/schemas.yaml#/User'
+                impersonated_by:
+                  type: [string, 'null']
+                  description: Present (admin display name) when this session is an admin impersonation — the portal renders the banner from it (M8, owner Δ3).
       '401':
         $ref: '../components/responses.yaml#/Unauthenticated'
+
+impersonate:
+  post:
+    operationId: auth.impersonate
+    tags: [auth]
+    summary: Exchange a one-time admin grant for an impersonated portal session
+    description: >
+      Consumes the short-TTL token issued by admin.accounts.impersonate on
+      the admin host (hosts never share cookies — ADR-0004). The resulting
+      session handles SERVICES, never identity: payment execution, account
+      deletion and credential/identity changes answer 403 and are audited.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [token]
+            properties:
+              token:
+                type: string
+    responses:
+      '200':
+        description: Impersonated session established (flagged, fully audited).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/User'
+                impersonated_by:
+                  type: string
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationFailed'
 
 totpSetup:
   post:

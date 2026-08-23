@@ -1,0 +1,111 @@
+# M8 — GDPR flows (§15.11, ADR-0005): export as queued JSON behind a signed
+# URL; delete = eligibility gate + PII anonymization with fiscal documents
+# retained per Greek tax law. The code implements the MECHANISM — retention
+# years/fields are confirmed by the lawyer (launch-tail legal review flag).
+
+accountsExport:
+  post:
+    operationId: accounts.export
+    tags: [accounts]
+    summary: Request a full data export (owner only, queued)
+    parameters:
+      - name: account
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '202':
+        description: Export queued; a notification delivers the signed download URL.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/DataRequest'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '409':
+        description: An export is already in flight (DATA_REQUEST_IN_FLIGHT).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
+
+accountsDataRequests:
+  get:
+    operationId: accounts.data-requests
+    tags: [accounts]
+    summary: List the account's export/delete requests
+    parameters:
+      - name: account
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: Data requests, newest first.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/DataRequest'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+accountsDataRequestDownload:
+  get:
+    operationId: accounts.data-requests.download
+    tags: [accounts]
+    summary: Download an export artifact (owner + signed URL, double expiry)
+    parameters:
+      - name: account
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: dataRequest
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: The JSON artifact as an attachment.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      '401':
+        $ref: '../components/responses.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '410':
+        description: Artifact expired or removed.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '../components/schemas.yaml#/Problem'
