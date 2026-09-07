@@ -13,7 +13,7 @@
         "check": "npm run lint && npm run bundle && npm run generate:client && git diff --exit-code dist/"
     },
     "devDependencies": {
-        "@redocly/cli": "^2.0.0",
+        "@redocly/cli": "^2.51.1",
         "openapi-typescript": "7.13.0"
     },
     "types": "./dist/client/index.d.ts",
